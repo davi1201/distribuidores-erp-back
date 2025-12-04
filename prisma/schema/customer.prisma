@@ -1,0 +1,136 @@
+// prisma/schema/customer.prisma
+
+enum PersonType {
+  PF // Física
+  PJ // Jurídica
+}
+
+model Customer {
+  id   String @id @default(uuid())
+  code Int    @default(autoincrement()) // Código sequencial amigável
+
+  // Dados Básicos
+  name       String
+  email      String
+  phone      String? // Contato principal
+  personType PersonType
+  document   String // CPF ou CNPJ
+  isActive   Boolean    @default(true)
+
+  // Dados PJ (Opcionais se for PF)
+  corporateName         String? // Razão Social
+  tradeName             String? // Nome Fantasia
+  stateRegistration     String? // Inscrição Estadual
+  municipalRegistration String? // Inscrição Municipal
+  isExempt              Boolean @default(false) // Isento de IE
+
+  // Dados Fiscais
+  isFinalConsumer   Boolean @default(false)
+  isICMSContributor Boolean @default(false)
+  invoiceNotes      String? @db.Text
+
+  // Configurações Financeiras / Vendas
+  priceListId        String? // Vinculo com Tabela de Preço (Futuro)
+  paymentConditionId String? // Vinculo com Condição Pagto (Futuro)
+  sellerId           String? // Vendedor Responsável
+  seller             User?   @relation(fields: [sellerId], references: [id])
+
+  creditLimit      Decimal @default(0) @db.Decimal(10, 2)
+  allowExceedLimit Boolean @default(false)
+
+  // Relacionamentos
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  categoryId String?
+  category   CustomerCategory? @relation(fields: [categoryId], references: [id])
+
+  contacts        Contact[]
+  addresses       Address[]
+  attachments     Attachment[]
+  financialTitles FinancialTitle[]
+
+  priceList PriceList? @relation(fields: [priceListId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Order     Order[]
+
+  // Regra: CPF/CNPJ único por tenant
+  @@unique([document, tenantId])
+  @@map("customers")
+}
+
+model Contact {
+  id    String  @id @default(uuid())
+  name  String
+  phone String
+  role  String? // Ex: Financeiro, Compras
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_contacts")
+}
+
+model Address {
+  id           String  @id @default(uuid())
+  zipCode      String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  city         String
+  state        String // UF
+  ibgeCode     String?
+
+  // Categoria do Endereço (Entrega, Cobrança, etc)
+  categoryId String
+  category   AddressCategory @relation(fields: [categoryId], references: [id])
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_addresses")
+}
+
+model AddressCategory {
+  id              String  @id @default(uuid())
+  description     String // Padrão, Entrega, Cobrança
+  isSystemDefault Boolean @default(false) // Se true, não pode deletar
+  isActive        Boolean @default(true)
+  tenantId        String
+  tenant          Tenant  @relation(fields: [tenantId], references: [id])
+
+  addresses Address[]
+
+  @@map("address_categories")
+}
+
+model CustomerCategory {
+  id          String  @id @default(uuid())
+  description String
+  isActive    Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  customers Customer[]
+
+  @@map("customer_categories")
+}
+
+model Attachment {
+  id   String @id @default(uuid())
+  name String
+  url  String // URL do S3 ou path local
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  Tenant    Tenant?  @relation(fields: [tenantId], references: [id])
+  tenantId  String?
+
+  @@map("customer_attachments")
+}

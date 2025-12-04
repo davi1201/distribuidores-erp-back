@@ -1,0 +1,26 @@
+model PriceList {
+  id       String  @id @default(uuid())
+  name     String // Ex: "Consumidor Final", "Salão Parceiro"
+  isActive Boolean @default(true)
+
+  percentageAdjustment Decimal? @db.Decimal(5, 2) // Ex: 10.00 para +10%, -5.00 para -5%
+
+  // Multi-tenancy
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Relacionamentos
+  customers Customer[]
+
+  // Futuro: Aqui você terá os preços dos produtos ligados a essa lista
+  // products  ProductPrice[] 
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productPrices ProductPrice[]
+  priceHistory  ProductPriceHistory[]
+  Order         Order[]
+
+  @@map("price_lists")
+}

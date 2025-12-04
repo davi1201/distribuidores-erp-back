@@ -1,0 +1,36 @@
+// Adicione ao seu schema existente
+
+enum StockMovementType {
+  ENTRY // Entrada (Compra, Produção, Devolução, Ajuste Positivo)
+  EXIT // Saída (Venda, Perda, Consumo, Ajuste Negativo)
+}
+
+// Histórico de Movimentações (Kardex)
+model StockMovement {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Relacionamento com Produto
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  // Dados da Movimentação
+  type     StockMovementType
+  reason   String // Ex: "Venda #123", "Nota Fiscal 555", "Ajuste de Inventário"
+  quantity Decimal           @db.Decimal(10, 4) // Quantidade movimentada
+
+  // Snapshots (Valores congelados no momento da operação)
+  costPrice    Decimal @default(0) @db.Decimal(10, 4) // Custo unitário no momento
+  balanceAfter Decimal @db.Decimal(10, 4) // Saldo resultante após a operação
+
+  // Auditoria
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, productId])
+  @@index([createdAt])
+  @@map("stock_movements")
+}

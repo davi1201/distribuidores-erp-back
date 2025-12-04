@@ -1,0 +1,50 @@
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAID
+  PENDING_PAYMENT
+  ENDED
+}
+
+model Subscription {
+  id String @id @default(uuid())
+
+  externalId String  @unique // O ID "sub_..." da Pagar.me
+  customerId String? // O ID "cus_..." da Pagar.me
+
+  status SubscriptionStatus @default(PENDING_PAYMENT)
+
+  // Datas de controle
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime? // Importante: Data que vence o acesso
+  canceledAt         DateTime?
+
+  // Relacionamentos
+  tenantId String @unique // Um tenant tem UMA assinatura ativa por vez
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  planId String
+  plan   Plan   @relation(fields: [planId], references: [id])
+
+  // Histórico de Faturas (opcional por agora, mas bom ter)
+  invoices Invoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id         String  @id @default(uuid())
+  externalId String  @unique // O ID "inv_..." da Pagar.me
+  amount     Decimal @db.Decimal(10, 2)
+  status     String // paid, pending, failed
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("invoices")
+}

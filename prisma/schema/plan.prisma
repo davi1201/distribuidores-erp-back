@@ -1,0 +1,18 @@
+model Plan {
+  id   String @id @default(uuid())
+  name String
+  slug String @unique
+
+  // Preços
+  price       Decimal  @db.Decimal(10, 2) // Preço Mensal (Padrão)
+  yearlyPrice Decimal? @db.Decimal(10, 2) // Preço Anual (Opcional)
+
+  isActive      Boolean        @default(true)
+  features      Json?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  tenants       Tenant[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}

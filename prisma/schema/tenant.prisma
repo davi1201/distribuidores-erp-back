@@ -1,0 +1,32 @@
+model Tenant {
+  id       String  @id @default(uuid())
+  slug     String  @unique // URL da empresa (ex: app.sistema.com/slug)
+  name     String // Nome de exibição
+  isActive Boolean @default(true)
+
+  billingProfile BillingProfile?
+
+  planId      String
+  plan        Plan      @relation(fields: [planId], references: [id])
+  trialEndsAt DateTime?
+  logoUrl     String?
+
+  users              User[]
+  customers          Customer[]
+  addressCategories  AddressCategory[]
+  customerCategories CustomerCategory[]
+  priceLists         PriceList[]
+  subscriptions      Subscription[]
+  attachments        Attachment[]
+  products           Product[]
+  taxProfiles        TaxProfile[]
+  financialTitles    FinancialTitle[]
+  financialMovements FinancialMovement[]
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  StockMovement StockMovement[]
+  Order         Order[]
+
+  @@map("tenants")
+}

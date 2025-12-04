@@ -1,0 +1,22 @@
+model State {
+  id   Int    @id @default(autoincrement())
+  name String
+  uf   String @unique
+
+  cities          City[]
+  billingProfiles BillingProfile[]
+
+  @@map("states")
+}
+
+model City {
+  id       Int    @id @default(autoincrement())
+  name     String
+  stateId  Int
+  state    State  @relation(fields: [stateId], references: [id])
+  ibgeCode String @unique
+
+  billingProfiles BillingProfile[]
+
+  @@map("cities")
+}

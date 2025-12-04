@@ -1,0 +1,66 @@
+enum OrderStatus {
+  DRAFT // Rascunho (Em digitação)
+  CONFIRMED // Confirmado (Reserva estoque)
+  INVOICED // Faturado (Nota fiscal emitida)
+  CANCELED // Cancelado
+  COMPLETED // Entregue/Finalizado
+}
+
+model Order {
+  id   String @id @default(uuid())
+  code Int    @default(autoincrement()) // Número do Pedido (ex: 1001)
+
+  // Quem comprou?
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id])
+
+  // Qual a regra de preço usada?
+  priceListId String
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+
+  // Totais (Calculados)
+  subtotal Decimal @db.Decimal(10, 2) // Soma dos itens
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  shipping Decimal @default(0) @db.Decimal(10, 2) // Frete
+  total    Decimal @db.Decimal(10, 2) // Final a pagar
+
+  // Impostos Totais (Soma dos itens)
+  totalIcms Decimal @default(0) @db.Decimal(10, 2)
+  totalIpi  Decimal @default(0) @db.Decimal(10, 2)
+
+  status OrderStatus @default(DRAFT)
+
+  items OrderItem[]
+
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  financialTitles FinancialTitle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Decimal @db.Decimal(10, 4)
+
+  // SNAPSHOTS (Valores congelados no momento da venda)
+  unitPrice  Decimal @db.Decimal(10, 2) // Preço unitário vindo da Tabela
+  discount   Decimal @default(0) @db.Decimal(10, 2)
+  totalPrice Decimal @db.Decimal(10, 2) // (Unit * Qty) - Discount
+
+  // Impostos do Item (Calculados pelo TaxProfile na hora da venda)
+  icmsRate Decimal @default(0) @db.Decimal(5, 2)
+  ipiRate  Decimal @default(0) @db.Decimal(5, 2)
+  // ... outros impostos
+
+  @@map("order_items")
+}

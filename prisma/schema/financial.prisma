@@ -1,0 +1,93 @@
+// --- ENUMS ---
+
+enum TitleStatus {
+  OPEN // Em aberto (A vencer ou Vencido)
+  PARTIAL // Pago parcialmente
+  PAID // Liquidado
+  CANCELED // Cancelado/Estornado
+  OVERDUE // Vencido (Status calculado, mas pode ser persistido para performance)
+}
+
+enum TitleType {
+  RECEIVABLE // Contas a Receber (Vendas)
+  PAYABLE // Contas a Pagar (Despesas - Futuro)
+}
+
+enum MovementType {
+  PAYMENT // Pagamento recebido
+  REVERSAL // Estorno
+  INTEREST // Lançamento de Juros
+  DISCOUNT // Concessão de Desconto
+  ADJUSTMENT // Ajuste manual
+}
+
+// --- TÍTULOS FINANCEIROS (A Pagar / A Receber) ---
+
+model FinancialTitle {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Identificação
+  titleNumber String // Ex: "PED-1001/1" (Parcela 1 do Pedido 1001)
+  description String? // Ex: "Venda de Produtos - Pedido #1001"
+  type        TitleType @default(RECEIVABLE)
+
+  // Vínculos
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  // Valores Principais
+  originalAmount Decimal @db.Decimal(10, 2) // Valor original da parcela
+  balance        Decimal @db.Decimal(10, 2) // Saldo restante (diminui conforme paga)
+
+  // Datas
+  issueDate      DateTime @default(now()) // Data de emissão (venda)
+  dueDate        DateTime // Data de Vencimento
+  competenceDate DateTime @default(now()) // Data para regime de competência (DRE)
+
+  // Controle
+  status        TitleStatus @default(OPEN)
+  paymentMethod String? // 'WALLET', 'PIX', 'CREDIT_CARD', 'BOLETO'
+
+  // Relacionamentos
+  movements FinancialMovement[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([customerId])
+  @@map("financial_titles")
+}
+
+// --- MOVIMENTAÇÕES (Extrato do Título) ---
+
+model FinancialMovement {
+  id       String @id @default(uuid())
+  tenantId String
+
+  titleId String
+  title   FinancialTitle @relation(fields: [titleId], references: [id], onDelete: Cascade)
+
+  type        MovementType
+  amount      Decimal      @db.Decimal(10, 2) // Valor movimentado
+  paymentDate DateTime     @default(now()) // Data efetiva do pagamento
+
+  // Auditoria
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  observation String?
+
+  // Futuro: BankAccountId para conciliação bancária
+
+  createdAt DateTime @default(now())
+  Tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@map("financial_movements")
+}

@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Gerar Token Pagar.me</title>
+  </head>
+  <body>
+    <h3>Gerador de Token para Teste</h3>
+    <script
+      src="https://assets.pagar.me/checkout/1.1.0/checkout.js"
+      data-encryption-key="pk_test_Nx0DdgMeS5UzK7Qm"
+    ></script>
+
+    <button id="pay-button">Gerar Token</button>
+    <p>Abra o Console (F12) para ver o token gerado.</p>
+
+    <script>
+      var button = document.querySelector('#pay-button');
+      button.addEventListener('click', function () {
+        // Inicia o checkout da Pagar.me apenas para gerar o token
+        var checkout = new PagarMeCheckout.Checkout({
+          encryption_key: 'pk_test_Nx0DdgMeS5UzK7Qm', // Repita a chave aqui
+          success: function (data) {
+            console.log('SUCESSO! COPIE ESTE TOKEN:');
+            console.log(data.token);
+            alert('Token gerado! Veja no Console (F12): ' + data.token);
+          },
+          error: function (err) {
+            console.error(err);
+            alert('Erro ao gerar token');
+          },
+        });
+
+        checkout.open({
+          amount: 1000,
+          createToken: 'true', // IMPORTANTE: Só gera o token, não cobra
+          paymentMethods: 'credit_card',
+          customerData: 'false',
+        });
+      });
+    </script>
+  </body>
+</html>

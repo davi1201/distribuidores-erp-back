@@ -1,0 +1,29 @@
+model BillingProfile {
+  id String @id @default(uuid())
+
+  personType PersonType @default(PJ)
+  document   String     @unique
+  email      String
+  phone      String
+
+  zipCode      String
+  street       String
+  number       String
+  complement   String?
+  neighborhood String
+  cityName     String
+  stateUf      String
+
+  cityId Int?
+  city   City? @relation(fields: [cityId], references: [id])
+
+  stateId Int?
+  state   State? @relation(fields: [stateId], references: [id])
+
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("billing_profiles")
+}
