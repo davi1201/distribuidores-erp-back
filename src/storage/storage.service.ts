@@ -1,7 +1,7 @@
 import {
-  BadRequestException,
   Injectable,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { Storage } from '@google-cloud/storage';
 import * as path from 'path';
@@ -12,11 +12,34 @@ export class StorageService {
   private bucket: string;
 
   constructor() {
-    this.storage = new Storage({
-      projectId: process.env.GCS_PROJECT_ID,
-      keyFilename: process.env.GCS_KEY_FILE_PATH,
-    });
-    this.bucket = process.env.GCS_BUCKET_NAME || 'default-bucket-name';
+    const projectId = process.env.GCS_PROJECT_ID;
+    const bucketName = process.env.GCS_BUCKET_NAME;
+
+    // Configuração Dinâmica
+    const storageOptions: any = {
+      projectId,
+    };
+
+    // 1. PRIORIDADE: Variável de Ambiente (Produção/Vercel)
+    // O JSON da chave deve estar em Base64 para evitar erros de quebra de linha
+    if (process.env.GCS_CREDENTIALS_BASE64) {
+      try {
+        const credentialsJson = Buffer.from(
+          process.env.GCS_CREDENTIALS_BASE64,
+          'base64',
+        ).toString('utf-8');
+        storageOptions.credentials = JSON.parse(credentialsJson);
+      } catch (error) {
+        console.error('Erro ao decodificar GCS_CREDENTIALS_BASE64', error);
+      }
+    }
+    // 2. FALLBACK: Arquivo Local (Desenvolvimento)
+    else if (process.env.GCS_KEY_FILE_PATH) {
+      storageOptions.keyFilename = process.env.GCS_KEY_FILE_PATH;
+    }
+
+    this.storage = new Storage(storageOptions);
+    this.bucket = bucketName || '';
   }
 
   async uploadFile(
@@ -24,16 +47,13 @@ export class StorageService {
     folder: string = 'general',
   ): Promise<{ url: string; name: string }> {
     try {
-      // 1. Gerar nome único para evitar sobreposição
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       const extension = path.extname(file.originalname);
       const filename = `${folder}/${uniqueSuffix}${extension}`;
 
-      // 2. Referência ao Bucket
       const bucket = this.storage.bucket(this.bucket);
       const fileUpload = bucket.file(filename);
 
-      // 3. Upload via Stream
       await new Promise((resolve, reject) => {
         const blobStream = fileUpload.createWriteStream({
           resumable: false,
@@ -46,16 +66,12 @@ export class StorageService {
         blobStream.on('error', (error) => reject(error));
 
         blobStream.on('finish', () => {
-          // Opcional: Se o bucket não for público por padrão, você pode torná-lo público aqui
-          // await fileUpload.makePublic();
           resolve(true);
         });
 
         blobStream.end(file.buffer);
       });
 
-      // 4. Montar a URL Pública
-      // Formato padrão: https://storage.googleapis.com/NOME_DO_BUCKET/NOME_DO_ARQUIVO
       const publicUrl = `https://storage.googleapis.com/${this.bucket}/${filename}`;
 
       return {
@@ -72,13 +88,9 @@ export class StorageService {
 
   async getSignedUrl(fileUrl: string): Promise<string> {
     try {
-      // A URL vem assim: https://storage.googleapis.com/NOME_DO_BUCKET/pasta/arquivo.pdf
-      // Precisamos extrair apenas: pasta/arquivo.pdf
-
       const bucketUrlPrefix = `https://storage.googleapis.com/${this.bucket}/`;
 
       if (!fileUrl.startsWith(bucketUrlPrefix)) {
-        // Se for um arquivo antigo ou de outro lugar, retorna a url original ou erro
         return fileUrl;
       }
 
@@ -90,13 +102,14 @@ export class StorageService {
         .getSignedUrl({
           version: 'v4',
           action: 'read',
-          expires: Date.now() + 60 * 60 * 1000, // Expira em 1 hora (60 min)
+          expires: Date.now() + 60 * 60 * 1000, // 1 hora
         });
 
       return signedUrl;
     } catch (error) {
       console.error('Erro ao gerar Signed URL:', error);
-      throw new BadRequestException('Não foi possível gerar link seguro.');
+      // Em caso de erro, retorna a original (pode ser pública) ou lança exceção
+      return fileUrl;
     }
   }
 }
