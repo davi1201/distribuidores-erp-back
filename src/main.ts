@@ -9,26 +9,14 @@ async function bootstrap() {
 
   const allowedOrigins = [
     'http://localhost:3005',
-    'https://distribuidores-erp-back.vercel.app',
+    'https://distribuidores-erp-front.vercel.app',
   ];
 
   app.enableCors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      return callback(new Error('Origin not allowed by CORS'), false);
-    },
-    credentials: true,
+    origin: allowedOrigins,
+    credentials: true, // Obrigatório pois usamos Cookies
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
   });
-
-  // app.enableCors({
-  //   origin: 'http://localhost:3005',
-  //   credentials: true,
-  // });
   await app.listen(5555);
 }
 bootstrap();
