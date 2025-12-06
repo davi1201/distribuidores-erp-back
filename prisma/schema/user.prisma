@@ -21,11 +21,14 @@ model User {
   // Vendas (Se este usuário for um vendedor)
   customers Customer[] // Carteira de clientes deste usuário
 
+  permissions String[] @default([])
+
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
   ProductPriceHistory ProductPriceHistory[]
   StockMovement       StockMovement[]
   FinancialMovement   FinancialMovement[]
+  Warehouse           Warehouse[]
 
   @@map("users")
 }

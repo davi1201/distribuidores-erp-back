@@ -21,7 +21,7 @@ export class CustomersService {
   async create(
     createCustomerDto: CreateCustomerDto,
     tenantId: string,
-    currentUser: User,
+    currentUser: any,
   ) {
     // 1. Verifica duplicidade de documento
     const docExists = await this.prisma.customer.findFirst({
@@ -41,7 +41,7 @@ export class CustomersService {
     if (currentUser.role === Role.SELLER) {
       // REGRA: Se é Vendedor, o cliente é OBRIGATORIAMENTE dele.
       // Ignoramos qualquer coisa que o front tenha mandado no sellerId.
-      finalSellerId = currentUser.id;
+      finalSellerId = currentUser.userId;
     } else {
       // REGRA: Se é ADMIN, OWNER ou SUPER_ADMIN.
       // Respeita a escolha do front. Se vier vazio (""), vira null (Cliente da Empresa).
@@ -78,11 +78,11 @@ export class CustomersService {
     });
   }
 
-  async findAll(tenantId: string, currentUser: User) {
+  async findAll(tenantId: string, currentUser: any) {
     const whereCondition: any = { tenantId };
 
     if (currentUser.role === Role.SELLER) {
-      whereCondition.sellerId = currentUser.id;
+      whereCondition.sellerId = currentUser.userId;
     }
 
     return this.prisma.customer.findMany({

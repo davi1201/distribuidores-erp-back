@@ -27,6 +27,8 @@ model Tenant {
   updatedAt     DateTime        @updatedAt
   StockMovement StockMovement[]
   Order         Order[]
+  Invite        Invite[]
+  Warehouse     Warehouse[]
 
   @@map("tenants")
 }

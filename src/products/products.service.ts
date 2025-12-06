@@ -15,6 +15,31 @@ const generateSku = customAlphabet('123456789ABCDEFGHJKLMNPQRSTUVWXYZ', 8);
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // --- HELPER: Depósito Padrão (Evita dependência circular com StockService) ---
+  private async getOrCreateDefaultWarehouse(tenantId: string, tx: any) {
+    const defaultWh = await tx.warehouse.findFirst({
+      where: { tenantId, isDefault: true },
+    });
+
+    if (defaultWh) return defaultWh;
+
+    const anyWh = await tx.warehouse.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (anyWh) return anyWh;
+
+    return tx.warehouse.create({
+      data: {
+        tenantId,
+        name: 'Depósito Principal (Matriz)',
+        isDefault: true,
+      },
+    });
+  }
+
   // --- CREATE COM RASTREABILIDADE ---
   async create(createDto: CreateProductDto, tenantId: string, user: User) {
     let finalSku = createDto.sku;
@@ -37,13 +62,16 @@ export class ProductsService {
 
     const sanitizedData = {
       ...productData,
-      sku: finalSku, // garante que sku é sempre string
+      sku: finalSku,
       taxProfileId: productData.taxProfileId || null,
       parentId: productData.parentId || null,
     };
 
     return this.prisma.$transaction(async (tx) => {
-      // 1. Cria o Produto
+      // 1. Garante Depósito
+      const warehouse = await this.getOrCreateDefaultWarehouse(tenantId, tx);
+
+      // 2. Cria o Produto
       const product = await tx.product.create({
         data: {
           ...sanitizedData,
@@ -57,36 +85,37 @@ export class ProductsService {
         },
       });
 
-      // 2. Cria o Item de Estoque (Configurações + Saldo Inicial)
+      // 3. Cria o Item de Estoque (No depósito padrão)
       const initialQty = Number(stock?.quantity || 0);
 
       await tx.stockItem.create({
         data: {
           productId: product.id,
-          quantity: initialQty, // Define o saldo inicial
+          warehouseId: warehouse.id,
+          quantity: initialQty,
           minStock: stock?.minStock || 0,
           maxStock: stock?.maxStock,
         },
       });
 
-      // 3. GERAR HISTÓRICO DE SALDO INICIAL (KARDEX)
-      // Se houve entrada de saldo inicial, precisamos registrar "de onde veio" esse número.
+      // 4. Histórico Inicial (Kardex)
       if (initialQty > 0) {
         await tx.stockMovement.create({
           data: {
             tenantId,
             productId: product.id,
-            type: 'ENTRY', // Movimentação de Entrada
+            type: 'ENTRY',
             quantity: initialQty,
             reason: 'Saldo Inicial (Cadastro de Produto)',
             costPrice: product.costPrice,
             balanceAfter: initialQty,
             userId: user.id,
+            toWarehouseId: warehouse.id, // Importante para rastreio
           },
         });
       }
 
-      // 4. Preços Iniciais
+      // 5. Preços Iniciais
       if (prices && prices.length > 0) {
         for (const p of prices) {
           await tx.productPrice.create({
@@ -138,12 +167,17 @@ export class ProductsService {
         data: sanitizedData,
       });
 
-      // 2. Atualiza CONFIGURAÇÕES de Estoque (Mínimo/Máximo)
-      // IMPORTANTE: Ignoramos 'quantity' aqui propositalmente para garantir a rastreabilidade.
-      // Movimentações de saldo devem ser feitas exclusivamente via StockService.
+      // 2. Atualiza Configurações de Estoque (No depósito padrão)
       if (stock) {
-        const existingStock = await tx.stockItem.findFirst({
-          where: { productId: id },
+        const warehouse = await this.getOrCreateDefaultWarehouse(tenantId, tx);
+
+        const existingStock = await tx.stockItem.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: id,
+              warehouseId: warehouse.id,
+            },
+          },
         });
 
         if (existingStock) {
@@ -156,10 +190,10 @@ export class ProductsService {
             },
           });
         } else {
-          // Se não existia, cria zerado apenas com as configs
           await tx.stockItem.create({
             data: {
               productId: id,
+              warehouseId: warehouse.id,
               quantity: 0, // Nasce zerado se criado no update
               minStock: stock.minStock || 0,
               maxStock: stock.maxStock,
@@ -231,7 +265,7 @@ export class ProductsService {
     });
   }
 
-  // --- FIND ONE (Mantido para suportar o retorno correto) ---
+  // --- FIND ONE ---
   async findOne(id: string, tenantId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
@@ -250,6 +284,7 @@ export class ProductsService {
       throw new NotFoundException('Produto não encontrado.');
     }
 
+    // Pega o primeiro item de estoque para exibir no form
     const stockItem = product.stock?.[0] || {
       quantity: 0,
       minStock: 0,
@@ -262,7 +297,7 @@ export class ProductsService {
     };
   }
 
-  // --- FIND ALL (Mantido para lista) ---
+  // --- FIND ALL ---
   async findAll(tenantId: string) {
     const products = await this.prisma.product.findMany({
       where: { tenantId, parentId: null },
@@ -278,10 +313,13 @@ export class ProductsService {
     });
 
     return products.map((product) => {
-      const parentQty = Number(product.stock?.[0]?.quantity || 0);
+      const parentQty = product.stock.reduce(
+        (acc, s) => acc + Number(s.quantity),
+        0,
+      );
 
       const variantsQty = product.variants.reduce((acc, v) => {
-        const vQty = Number(v.stock?.[0]?.quantity || 0);
+        const vQty = v.stock.reduce((accS, s) => accS + Number(s.quantity), 0);
         return acc + vQty;
       }, 0);
 
@@ -292,15 +330,14 @@ export class ProductsService {
     });
   }
 
+  // --- CALCULATE PRICING ---
   async calculatePricing(dto: CalculatePriceDto, tenantId: string) {
     const { costPrice, expenses, markup, taxProfileId, destinationState } = dto;
 
-    // 1. Valores Iniciais
     const cost = Number(costPrice);
     const expensesPct = Number(expenses);
     const markupPct = Number(markup);
 
-    // 2. Busca Regras Fiscais (se houver perfil)
     let icmsRate = 0;
     let pisRate = 0;
     let cofinsRate = 0;
@@ -314,14 +351,11 @@ export class ProductsService {
       });
 
       if (profile && profile.rules.length > 0) {
-        // Tenta achar a regra específica para o destino
         let rule = profile.rules.find(
           (r) => r.destinationState === destinationState,
         );
 
-        // Se não achou ou não foi informado destino, pega a primeira (fallback)
         if (!rule) {
-          // Tenta pegar regra interna (Origem = Destino) como padrão
           rule =
             profile.rules.find((r) => r.originState === r.destinationState) ||
             profile.rules[0];
@@ -337,23 +371,14 @@ export class ProductsService {
       }
     }
 
-    // 3. Cálculo Matemático (Mark-up Divisor "Por Dentro")
     const taxesTotalPct = icmsRate + pisRate + cofinsRate + ipiRate;
     const totalDeductionsPct = taxesTotalPct + expensesPct;
 
-    // A. Lucro (R$)
     const profitValue = cost * (markupPct / 100);
-
-    // B. Líquido Necessário
     const netValueRequired = cost + profitValue;
-
-    // C. Divisor (1 - Taxas)
     const divisor = (100 - totalDeductionsPct) / 100;
-
-    // D. Preço Final
     const finalPrice = divisor > 0 ? netValueRequired / divisor : 0;
 
-    // 4. Detalhamento em Reais (para o frontend mostrar)
     const taxValues = {
       icms: finalPrice * (icmsRate / 100),
       pis: finalPrice * (pisRate / 100),
@@ -364,7 +389,7 @@ export class ProductsService {
     };
 
     return {
-      basePrice: Math.round(finalPrice * 100) / 100, // Arredondado
+      basePrice: Math.round(finalPrice * 100) / 100,
       calculationDetails: {
         cost,
         profitValue,

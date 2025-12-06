@@ -19,9 +19,11 @@ import { Roles } from 'src/auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { BillingGuard } from 'src/auth/guards/billing.guard';
+import { PermissionsGuard } from 'src/auth/guards/permissions.guard';
+import { RequirePermissions } from 'src/auth/decorators/permissions.decorator';
 
 @Controller('customers')
-@UseGuards(JwtAuthGuard, RolesGuard, BillingGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, BillingGuard, PermissionsGuard)
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 

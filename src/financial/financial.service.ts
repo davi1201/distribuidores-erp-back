@@ -141,17 +141,52 @@ export class FinancialService {
   // --- EXTRATO DE TÍTULOS ---
   async findAll(
     tenantId: string,
-    filters: { status?: string; customerId?: string },
+    user: any,
+    filters: {
+      status?: string;
+      customerId?: string;
+      startDate?: string; // Filtro de Data Início
+      endDate?: string; // Filtro de Data Fim
+    },
   ) {
     const where: any = { tenantId };
 
+    // Filtros básicos
     if (filters.status) where.status = filters.status;
     if (filters.customerId) where.customerId = filters.customerId;
+
+    // Filtro de Período (Vencimento)
+    if (filters.startDate || filters.endDate) {
+      where.dueDate = {};
+
+      if (filters.startDate) {
+        const start = new Date(filters.startDate);
+        // Força 00:00:00.000 UTC
+        start.setUTCHours(0, 0, 0, 0);
+        where.dueDate.gte = start;
+      }
+
+      if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        // Força 23:59:59.999 UTC
+        end.setUTCHours(23, 59, 59, 999);
+        where.dueDate.lte = end;
+      }
+    }
+
+    // --- LÓGICA DE SEGURANÇA PARA VENDEDOR ---
+    if (user.role === 'SELLER') {
+      where.customer = {
+        sellerId: user.userId,
+      };
+    }
 
     return this.prisma.financialTitle.findMany({
       where,
       include: {
-        customer: { select: { name: true } },
+        customer: {
+          select: { name: true, sellerId: true },
+        },
         order: { select: { code: true } },
       },
       orderBy: { dueDate: 'asc' },

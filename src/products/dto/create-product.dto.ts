@@ -46,6 +46,10 @@ export class CreateStockItemDto {
   @IsNumber()
   @IsOptional()
   maxStock?: number;
+
+  @IsString()
+  @IsOptional()
+  warehouseId?: string;
 }
 
 export class CreateProductDto {

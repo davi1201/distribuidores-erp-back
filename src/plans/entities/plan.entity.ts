@@ -35,4 +35,10 @@ export class PlanEntity implements Plan {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty({
+    example: 100,
+    description: 'Número máximo de usuários permitidos no plano',
+  })
+  maxUsers: number;
 }

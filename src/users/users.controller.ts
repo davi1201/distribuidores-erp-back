@@ -1,16 +1,34 @@
-import { Controller, Get, Body, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Body, Patch, UseGuards, Param } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { Roles } from 'src/auth/decorators/roles.decorator';
+import { Role } from '@prisma/client';
+import { UpdatePermissionsDto } from './dto/update-permissions.dto';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
   getProfile(@CurrentUser() user: any) {
     return this.usersService.getProfile(user.userId);
+  }
+
+  @Patch(':id/permissions')
+  @Roles(Role.OWNER, Role.ADMIN)
+  updatePermissions(
+    @Param('id') id: string,
+    @Body() dto: UpdatePermissionsDto,
+    @CurrentUser() currentUser: any,
+  ) {
+    return this.usersService.updatePermissions(
+      id,
+      dto.permissions,
+      currentUser,
+    );
   }
 
   @Patch('me')

@@ -100,7 +100,7 @@ model TaxRule {
   cofinsRate       Decimal    @default(0) @db.Decimal(5, 2)
   updatedAt        DateTime   @updatedAt
 
-  @@unique([taxProfileId, originState, destinationState])
+  @@unique([taxProfileId, originState, destinationState])  
   @@map("tax_rules")
 }
 
@@ -113,5 +113,9 @@ model StockItem {
   maxStock  Decimal? @db.Decimal(10, 4)
   updatedAt DateTime @updatedAt
 
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([productId, warehouseId]) 
   @@map("stock_items")
 }

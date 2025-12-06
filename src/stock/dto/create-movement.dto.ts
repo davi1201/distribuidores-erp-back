@@ -21,6 +21,7 @@ export enum MovementReason {
 export enum MovementType {
   ENTRY = 'ENTRY',
   EXIT = 'EXIT',
+  TRANSFER = 'TRANSFER',
 }
 
 export class CreateStockMovementDto {

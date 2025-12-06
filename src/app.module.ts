@@ -22,6 +22,7 @@ import { SalesModule } from './sales/sales.module';
 import { FinancialModule } from './financial/financial.module';
 import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { TeamModule } from './team/team.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     SalesModule,
     FinancialModule,
     DashboardModule,
+    TeamModule,
   ],
   controllers: [],
   providers: [

@@ -38,10 +38,14 @@ export class FinancialController {
     @CurrentUser() user: User,
     @Query('status') status?: string,
     @Query('customerId') customerId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
   ) {
-    return this.financialService.findAll(user.tenantId || '', {
+    return this.financialService.findAll(user.tenantId || '', user, {
       status,
       customerId,
+      startDate,
+      endDate,
     });
   }
 

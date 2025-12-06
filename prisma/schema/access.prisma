@@ -1,0 +1,16 @@
+model Invite {
+  id    String @id @default(uuid())
+  email String
+  role  Role   @default(SELLER) // Geralmente convida-se vendedores
+
+  token String @unique // Token enviado no link do email
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@map("invites")
+}

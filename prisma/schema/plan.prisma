@@ -14,5 +14,7 @@ model Plan {
   tenants       Tenant[]
   subscriptions Subscription[]
 
+  maxUsers Int @default(1) // Limite de usuários (1 = Só o dono)
+
   @@map("plans")
 }

@@ -3,6 +3,7 @@
 enum StockMovementType {
   ENTRY // Entrada (Compra, Produção, Devolução, Ajuste Positivo)
   EXIT // Saída (Venda, Perda, Consumo, Ajuste Negativo)
+  TRANSFER // Transferência entre depósitos
 }
 
 // Histórico de Movimentações (Kardex)
@@ -28,9 +29,40 @@ model StockMovement {
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
+  // NOVOS CAMPOS DE RASTREIO
+  fromWarehouseId String?
+  fromWarehouse   Warehouse? @relation("MovementFrom", fields: [fromWarehouseId], references: [id])
+
+  toWarehouseId String?
+  toWarehouse   Warehouse? @relation("MovementTo", fields: [toWarehouseId], references: [id])
+
   createdAt DateTime @default(now())
 
   @@index([tenantId, productId])
   @@index([createdAt])
   @@map("stock_movements")
+}
+
+model Warehouse {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name      String // Ex: "Matriz", "Carro do João", "Depósito Secundário"
+  isDefault Boolean @default(false) // Se é o estoque principal
+
+  // Vínculo Opcional: Esse depósito pertence a um vendedor específico?
+  responsibleUserId String?
+  responsibleUser   User?   @relation(fields: [responsibleUserId], references: [id])
+
+  stockItems StockItem[]
+
+  // Rastreabilidade de origem/destino
+  movementsFrom StockMovement[] @relation("MovementFrom")
+  movementsTo   StockMovement[] @relation("MovementTo")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("warehouses")
 }

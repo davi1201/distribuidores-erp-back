@@ -1,8 +1,10 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { TenantsService } from 'src/tenants/tenants.service';
 
@@ -73,6 +75,7 @@ export class UsersService {
 
       planSlug: tenant?.plan?.slug,
       planName: tenant?.plan?.name,
+      planMaxUsers: tenant?.plan?.maxUsers,
 
       status,
       isTrial: status === 'TRIAL',
@@ -205,5 +208,35 @@ export class UsersService {
     });
 
     return this.getProfile(userId);
+  }
+
+  async updatePermissions(
+    targetUserId: string,
+    newPermissions: string[],
+    currentUser: any,
+  ) {
+    const targetUser = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+    });
+
+    if (!targetUser) throw new NotFoundException('Usuário não encontrado');
+
+    if (targetUser.tenantId !== currentUser.tenantId) {
+      throw new ForbiddenException('Acesso negado');
+    }
+
+    if (targetUser.role === Role.OWNER) {
+      throw new ForbiddenException(
+        'Não é possível alterar permissões do Dono.',
+      );
+    }
+
+    return this.prisma.user.update({
+      where: { id: targetUserId },
+      data: {
+        permissions: newPermissions,
+      },
+      select: { id: true, name: true, permissions: true },
+    });
   }
 }
