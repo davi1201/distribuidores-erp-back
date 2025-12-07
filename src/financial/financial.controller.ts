@@ -10,8 +10,8 @@ import {
 import { FinancialService } from './financial.service';
 import { CreateTitleDto } from './dto/create-title.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 
 @Controller('financial')

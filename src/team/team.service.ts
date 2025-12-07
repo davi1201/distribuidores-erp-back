@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { addDays } from 'date-fns';

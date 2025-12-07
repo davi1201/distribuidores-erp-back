@@ -5,10 +5,10 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
-import { PaymentService } from 'src/payment/payment.service';
+import { PaymentService } from '../payment/payment.service';
 import { addDays } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 import { LoginDto } from './dto/login.dto';

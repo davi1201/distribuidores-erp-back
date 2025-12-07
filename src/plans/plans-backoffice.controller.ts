@@ -10,11 +10,11 @@ import {
 import { PlansService } from './plans.service';
 import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
-import { Roles } from 'src/auth/decorators/roles.decorator'; // Vamos criar jájá
+import { Roles } from '../auth/decorators/roles.decorator'; // Vamos criar jájá
 import { Role } from '@prisma/client';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Audit } from 'src/audit/decorators/audit.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Audit } from '../audit/decorators/audit.decorator';
 
 @Controller('backoffice/plans')
 @UseGuards(JwtAuthGuard, RolesGuard)

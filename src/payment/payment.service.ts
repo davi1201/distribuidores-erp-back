@@ -4,9 +4,9 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
-import { AuditService } from 'src/audit/audit.service';
+import { AuditService } from '../audit/audit.service';
 import { UpgradeSubscriptionDto } from './dto/upgrade-subscription';
 
 @Injectable()

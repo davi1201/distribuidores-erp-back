@@ -8,8 +8,8 @@ import {
   Headers,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
-import * as currentUserDecorator from 'src/auth/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import * as currentUserDecorator from '../auth/decorators/current-user.decorator';
 
 class SubscribeDto {
   planSlug: string;
