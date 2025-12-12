@@ -1,6 +1,7 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 
 export interface UserPayload {
+  id: string;
   userId: string;
   email: string;
   role: string;

@@ -23,6 +23,10 @@ import { FinancialModule } from './financial/financial.module';
 import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TeamModule } from './team/team.module';
+import { SuppliersModule } from './suppliers/suppliers.module';
+import { NfeModule } from './nfe/nfe.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -44,6 +48,10 @@ import { TeamModule } from './team/team.module';
     FinancialModule,
     DashboardModule,
     TeamModule,
+    SuppliersModule,
+    NfeModule,
+    ScheduleModule.forRoot(),
+    NotificationsModule,
   ],
   controllers: [],
   providers: [

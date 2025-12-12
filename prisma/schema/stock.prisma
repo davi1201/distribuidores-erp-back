@@ -57,6 +57,9 @@ model Warehouse {
 
   stockItems StockItem[]
 
+  transfersOrigin      StockTransfer[] @relation("TransferOrigin")
+  transfersDestination StockTransfer[] @relation("TransferDestination")
+
   // Rastreabilidade de origem/destino
   movementsFrom StockMovement[] @relation("MovementFrom")
   movementsTo   StockMovement[] @relation("MovementTo")
@@ -65,4 +68,64 @@ model Warehouse {
   updatedAt DateTime @updatedAt
 
   @@map("warehouses")
+}
+
+enum TransferStatus {
+  PENDING // Solicitado pelo vendedor, aguardando Matriz
+  APPROVED // Aprovado pela Matriz (Saiu do estoque físico da origem)
+  IN_TRANSIT // Em trânsito (Opcional, pode ser usado junto com APPROVED)
+  COMPLETED // Recebido pelo vendedor (Entrou no estoque destino)
+  REJECTED // Negado
+}
+
+model StockTransfer {
+  id   String @id @default(uuid())
+  code Int    @default(autoincrement()) // Ex: TR-1001
+
+  status TransferStatus @default(PENDING)
+
+  // QUEM PEDIU
+  requesterId String
+  requester   User   @relation("RequesterUser", fields: [requesterId], references: [id])
+
+  // QUEM APROVOU
+  approvedByUserId String?
+  approvedBy       User?   @relation("ApproverUser", fields: [approvedByUserId], references: [id])
+
+  // QUEM RECEBEU
+  receivedByUserId String?
+  receivedBy       User?   @relation("ReceiverUser", fields: [receivedByUserId], references: [id])
+
+  // De onde sai? (Geralmente Matriz)
+  originId String
+  origin   Warehouse @relation("TransferOrigin", fields: [originId], references: [id])
+
+  // Para onde vai? (Depósito do Vendedor)
+  destinationId String
+  destination   Warehouse @relation("TransferDestination", fields: [destinationId], references: [id])
+
+  items StockTransferItem[]
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User?    @relation(fields: [userId], references: [id])
+  userId    String?
+
+  @@map("stock_transfers")
+}
+
+model StockTransferItem {
+  id         String        @id @default(uuid())
+  transferId String
+  transfer   StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  quantity Decimal @db.Decimal(10, 4)
+
+  @@map("stock_transfer_items")
 }

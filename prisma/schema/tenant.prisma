@@ -23,12 +23,34 @@ model Tenant {
   financialTitles    FinancialTitle[]
   financialMovements FinancialMovement[]
 
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
-  StockMovement StockMovement[]
-  Order         Order[]
-  Invite        Invite[]
-  Warehouse     Warehouse[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  StockMovement     StockMovement[]
+  Order             Order[]
+  Invite            Invite[]
+  Warehouse         Warehouse[]
+  Supplier          Supplier[]
+  ProductSupplier   ProductSupplier[]
+  StockTransfer     StockTransfer[]
+  NfeInbox          NfeInbox[]
+  TenantEmailConfig TenantEmailConfig?
 
   @@map("tenants")
+}
+
+model TenantEmailConfig {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  host     String // ex: imap.gmail.com
+  port     Int     @default(993)
+  user     String // email
+  password String // senha de app (criptografada idealmente)
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("tenant_email_configs")
 }

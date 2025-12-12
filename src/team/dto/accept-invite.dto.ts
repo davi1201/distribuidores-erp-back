@@ -1,17 +1,10 @@
-import { IsNotEmpty, IsString, MinLength, IsUUID } from 'class-validator';
+import { IsString, MinLength } from 'class-validator';
 
 export class AcceptInviteDto {
-  @IsUUID()
-  @IsNotEmpty()
-  token: string; // O token que veio na URL
+  @IsString()
+  token: string;
 
   @IsString()
-  @IsNotEmpty()
-  @MinLength(3, { message: 'O nome deve ter pelo menos 3 caracteres.' })
-  name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(6, { message: 'A senha deve ter pelo menos 6 caracteres.' })
+  @MinLength(6, { message: 'A senha deve ter no mínimo 6 caracteres.' })
   password: string;
 }

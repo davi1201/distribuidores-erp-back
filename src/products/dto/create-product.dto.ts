@@ -1,47 +1,38 @@
-import { Type } from 'class-transformer';
 import {
-  IsArray,
-  IsBoolean,
-  IsInt,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
   IsString,
-  Min,
+  IsOptional,
+  IsNumber,
+  IsArray,
   ValidateNested,
+  IsBoolean,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
-// DTO para Imagens
-export class CreateProductImageDto {
+export class ProductImageDto {
   @IsString()
-  @IsNotEmpty()
   url: string;
 
-  @IsInt()
+  @IsNumber()
   @IsOptional()
   order?: number;
 }
 
-// DTO para Preços (por Lista de Preço)
-export class CreateProductPriceDto {
+export class ProductPriceDto {
   @IsString()
-  @IsNotEmpty()
   priceListId: string;
 
   @IsNumber()
-  @Min(0)
   price: number;
 }
 
-// DTO para Estoque Inicial
-export class CreateStockItemDto {
+export class ProductStockDto {
   @IsNumber()
-  @Min(0)
-  quantity: number;
+  @IsOptional()
+  quantity?: number;
 
   @IsNumber()
-  @Min(0)
-  minStock: number;
+  @IsOptional()
+  minStock?: number;
 
   @IsNumber()
   @IsOptional()
@@ -52,10 +43,22 @@ export class CreateStockItemDto {
   warehouseId?: string;
 }
 
-export class CreateProductDto {
-  // --- Identificação ---
+export class ProductSupplierDto {
   @IsString()
-  @IsNotEmpty()
+  supplierId: string;
+
+  @IsString()
+  @IsOptional()
+  supplierProductCode?: string;
+
+  @IsNumber()
+  @IsOptional()
+  lastPrice?: number;
+}
+
+// DTO para criar produto simples
+export class CreateProductDto {
+  @IsString()
   name: string;
 
   @IsString()
@@ -78,7 +81,6 @@ export class CreateProductDto {
   @IsOptional()
   unit?: string;
 
-  // --- Variação (Opcional) ---
   @IsString()
   @IsOptional()
   parentId?: string;
@@ -87,9 +89,7 @@ export class CreateProductDto {
   @IsOptional()
   variantName?: string;
 
-  // --- Fiscal (Obrigatório para ERP) ---
   @IsString()
-  @IsNotEmpty()
   ncm: string;
 
   @IsString()
@@ -100,7 +100,7 @@ export class CreateProductDto {
   @IsOptional()
   cfop?: string;
 
-  @IsInt()
+  @IsNumber()
   @IsOptional()
   origin?: number;
 
@@ -108,39 +108,166 @@ export class CreateProductDto {
   @IsOptional()
   taxProfileId?: string;
 
-  // --- Custos Base ---
   @IsNumber()
-  @Min(0)
-  costPrice: number;
+  @IsOptional()
+  costPrice?: number;
 
   @IsNumber()
-  @Min(0)
-  expenses: number;
+  @IsOptional()
+  expenses?: number;
 
   @IsNumber()
-  @Min(0)
-  markup: number;
+  @IsOptional()
+  markup?: number;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductPriceDto)
+  @IsOptional()
+  prices?: ProductPriceDto[];
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductImageDto)
+  @IsOptional()
+  images?: ProductImageDto[];
+
+  @ValidateNested()
+  @Type(() => ProductStockDto)
+  @IsOptional()
+  stock?: ProductStockDto;
+
+  @ValidateNested()
+  @Type(() => ProductSupplierDto)
+  @IsOptional()
+  supplier?: ProductSupplierDto;
 
   @IsBoolean()
   @IsOptional()
   isActive?: boolean;
+}
 
-  // --- Relacionamentos Aninhados ---
+// DTO para dados do produto PAI
+export class ParentProductDataDto {
+  @IsString()
+  name: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @IsString()
+  @IsOptional()
+  sku?: string;
+
+  @IsString()
+  ncm: string;
+
+  @IsString()
+  @IsOptional()
+  cest?: string;
+
+  @IsString()
+  @IsOptional()
+  cfop?: string;
+
+  @IsNumber()
+  @IsOptional()
+  origin?: number;
+
+  @IsString()
+  @IsOptional()
+  taxProfileId?: string;
+}
+
+// DTO para cada variante
+export class ProductVariantDto {
+  @IsString()
+  name: string; // Ex: "400ml", "Azul", etc
+
+  @IsString()
+  @IsOptional()
+  sku?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  brand?: string;
+
+  @IsString()
+  @IsOptional()
+  unit?: string;
+
+  @IsString()
+  @IsOptional()
+  ncm?: string;
+
+  @IsString()
+  @IsOptional()
+  cest?: string;
+
+  @IsString()
+  @IsOptional()
+  cfop?: string;
+
+  @IsNumber()
+  @IsOptional()
+  origin?: number;
+
+  @IsString()
+  @IsOptional()
+  taxProfileId?: string;
+
+  @IsNumber()
+  costPrice: number;
+
+  @IsNumber()
+  @IsOptional()
+  expenses?: number;
+
+  @IsNumber()
+  @IsOptional()
+  markup?: number;
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateProductImageDto)
+  @Type(() => ProductPriceDto)
   @IsOptional()
-  images?: CreateProductImageDto[];
+  prices?: ProductPriceDto[];
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateProductPriceDto)
+  @Type(() => ProductImageDto)
   @IsOptional()
-  prices?: CreateProductPriceDto[];
+  images?: ProductImageDto[];
 
   @ValidateNested()
-  @Type(() => CreateStockItemDto)
+  @Type(() => ProductStockDto)
   @IsOptional()
-  stock?: CreateStockItemDto;
+  stock?: ProductStockDto;
+
+  @ValidateNested()
+  @Type(() => ProductSupplierDto)
+  @IsOptional()
+  supplier?: ProductSupplierDto;
+}
+
+// DTO para criar produtos em lote (com variantes)
+export class CreateProductBatchDto {
+  @ValidateNested()
+  @Type(() => ParentProductDataDto)
+  @IsOptional()
+  parentData?: ParentProductDataDto; // null se for produto simples
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ProductVariantDto)
+  variants: ProductVariantDto[]; // Array com 1 item = produto simples; 2+ = grade
 }

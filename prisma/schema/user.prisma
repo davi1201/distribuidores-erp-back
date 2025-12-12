@@ -29,6 +29,17 @@ model User {
   StockMovement       StockMovement[]
   FinancialMovement   FinancialMovement[]
   Warehouse           Warehouse[]
+  SellerProfile       SellerProfile?
+  StockTransfer       StockTransfer[]
+
+  // Transferências que ele pediu
+  transfersRequested StockTransfer[] @relation("RequesterUser")
+
+  // Transferências que ele aprovou (Admin/Matriz)
+  transfersApproved StockTransfer[] @relation("ApproverUser")
+
+  // Transferências que ele conferiu/recebeu (Seller)
+  transfersReceived StockTransfer[] @relation("ReceiverUser")
 
   @@map("users")
 }
@@ -39,4 +50,29 @@ enum Role {
   ADMIN
   SELLER
   SUPPORT
+}
+
+model SellerProfile {
+  id String @id @default(uuid())
+
+  // Chave estrangeira para o User
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Configurações Específicas do Vendedor
+  whatsapp String?
+  cpf      String?
+
+  // Regras de Negócio
+  commissionRate Decimal  @default(0.0) // Ex: 5.0 para 5%
+  maxDiscount    Decimal  @default(10.0) // Limite máximo de desconto que ele pode dar
+  monthlyGoal    Decimal? // Meta mensal
+
+  // Controle interno
+  notes String? // Observações do gerente sobre o vendedor
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("seller_profiles")
 }

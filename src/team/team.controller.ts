@@ -14,6 +14,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 
 @Controller('team')
 export class TeamController {
@@ -31,15 +32,8 @@ export class TeamController {
 
   @UseGuards(JwtAuthGuard)
   @Post('invite')
-  inviteMember(
-    @CurrentUser() user: User,
-    @Body() body: { email: string; role: string },
-  ) {
-    return this.teamService.inviteMember(
-      user.tenantId ?? '',
-      body.email,
-      body.role as any,
-    );
+  inviteMember(@CurrentUser() user: User, @Body() dto: InviteMemberDto) {
+    return this.teamService.inviteMember(user.tenantId ?? '', dto);
   }
 
   @UseGuards(JwtAuthGuard)

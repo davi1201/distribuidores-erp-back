@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import cookieParser from 'cookie-parser'; // Importação mais segura para TS
+import { RedisIoAdapter } from './adpters/redis.io.adapter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -38,6 +39,11 @@ async function bootstrap() {
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     allowedHeaders: 'Content-Type, Accept, Authorization, X-Requested-With', // Adicionei headers comuns
   });
+
+  // CONFIGURAÇÃO DO REDIS ADAPTER
+  const redisIoAdapter = new RedisIoAdapter(app);
+  await redisIoAdapter.connectToRedis(); // Conecta no Redis antes de subir o app
+  app.useWebSocketAdapter(redisIoAdapter); // Aplica o adaptador
 
   await app.listen(5555);
 }

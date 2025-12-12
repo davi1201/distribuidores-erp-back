@@ -1,0 +1,28 @@
+enum NfeInboxStatus {
+  PENDING // Chegou, aguardando ação
+  IMPORTED // Usuário importou
+  IGNORED // Usuário descartou
+  ERROR // Erro ao processar
+}
+
+model NfeInbox {
+  id        String  @id @default(uuid())
+  accessKey String? // Chave da nota
+
+  senderEmail String? // Quem mandou o email
+  receivedAt  DateTime @default(now())
+
+  xmlContent String @db.Text // O XML bruto
+
+  status NfeInboxStatus @default(PENDING)
+
+  // Vínculo com o Tenant (Descoberto via CNPJ do Destinatário)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@map("nfe_inbox")
+}

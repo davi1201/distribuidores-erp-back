@@ -4,9 +4,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import type { User } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-sale.dto';
 import { FinancialService } from '../financial/financial.service';
+import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class SalesService {
@@ -26,41 +26,27 @@ export class SalesService {
       installments,
     } = createDto;
 
-    // 1. DEFINIÇÃO DO DEPÓSITO DE SAÍDA (Warehouse Logic)
-    // Tenta encontrar um depósito vinculado ao usuário (ex: Carro do Vendedor)
-    let warehouse = await this.prisma.warehouse.findFirst({
-      where: {
-        tenantId,
-        responsibleUserId: user.userId,
-      },
+    // 1. CARREGAMENTO DOS DEPÓSITOS (Vendedor e Matriz)
+
+    // Busca depósito do Vendedor (Se existir)
+    const sellerWarehouse = await this.prisma.warehouse.findFirst({
+      where: { tenantId, responsibleUserId: user.userId },
     });
 
-    // Se não tiver (é o Dono ou Vendedor interno), usa a Matriz (Default)
-    if (!warehouse) {
-      warehouse = await this.prisma.warehouse.findFirst({
-        where: { tenantId, isDefault: true },
-      });
+    // Busca depósito da Matriz (Default)
+    const matrixWarehouse = await this.prisma.warehouse.findFirst({
+      where: { tenantId, isDefault: true },
+    });
+
+    // Validação básica
+    if (!sellerWarehouse && !matrixWarehouse) {
+      throw new BadRequestException('Nenhum depósito configurado no sistema.');
     }
 
-    // Fallback de segurança: Pega qualquer um se não tiver default
-    if (!warehouse) {
-      warehouse = await this.prisma.warehouse.findFirst({
-        where: { tenantId },
-        orderBy: { createdAt: 'asc' },
-      });
-    }
-
-    if (!warehouse) {
-      throw new BadRequestException(
-        'Nenhum depósito de estoque encontrado para realizar a baixa.',
-      );
-    }
-
+    // 2. VALIDAÇÃO DO CLIENTE E ENDEREÇO
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
-      include: {
-        addresses: true,
-      },
+      include: { addresses: true },
     });
 
     if (!customer || customer.tenantId !== tenantId) {
@@ -69,9 +55,7 @@ export class SalesService {
 
     const deliveryAddress = customer.addresses[0];
     if (!deliveryAddress) {
-      throw new BadRequestException(
-        'Cliente não possui endereço cadastrado para cálculo de impostos.',
-      );
+      throw new BadRequestException('Cliente sem endereço cadastrado.');
     }
 
     const tenant = await this.prisma.tenant.findUnique({
@@ -82,11 +66,16 @@ export class SalesService {
     const originState = tenant?.billingProfile?.stateUf || 'PR';
     const destinationState = deliveryAddress.state;
 
-    // INÍCIO DA TRANSAÇÃO (Pedido + Estoque)
+    // --- INÍCIO DA TRANSAÇÃO ---
     const order = await this.prisma.$transaction(async (tx) => {
       let subtotal = 0;
       let totalIcms = 0;
       let totalIpi = 0;
+
+      // Flag para controlar o status do pedido
+      // Se pegar algo da matriz (e o usuário for seller), vira SEPARATION
+      let needsSeparation = false;
+
       const orderItemsData: Array<{
         productId: string;
         quantity: number;
@@ -112,61 +101,101 @@ export class SalesService {
           );
         }
 
-        // --- BAIXA DE ESTOQUE ---
-        // 1. Busca saldo no depósito correto
-        const stockItem = await tx.stockItem.findUnique({
+        const quantityToSell = Number(itemDto.quantity);
+
+        // --- LÓGICA DE BAIXA DE ESTOQUE HÍBRIDA ---
+        let sourceWarehouseId: string | null = null;
+
+        // A. Tenta no Depósito do Vendedor (Prioridade)
+        if (sellerWarehouse) {
+          const sellerStock = await tx.stockItem.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: product.id,
+                warehouseId: sellerWarehouse.id,
+              },
+            },
+          });
+
+          if (sellerStock && Number(sellerStock.quantity) >= quantityToSell) {
+            sourceWarehouseId = sellerWarehouse.id;
+          }
+        }
+
+        // B. Se não tem no Vendedor, tenta na Matriz (Fallback)
+        if (!sourceWarehouseId && matrixWarehouse) {
+          const matrixStock = await tx.stockItem.findUnique({
+            where: {
+              productId_warehouseId: {
+                productId: product.id,
+                warehouseId: matrixWarehouse.id,
+              },
+            },
+          });
+
+          if (matrixStock && Number(matrixStock.quantity) >= quantityToSell) {
+            sourceWarehouseId = matrixWarehouse.id;
+
+            // Se quem está vendendo é SELLER e usou estoque da MATRIZ
+            if (user.role === 'SELLER') {
+              needsSeparation = true;
+            }
+          }
+        }
+
+        // C. Se não achou em lugar nenhum
+        if (!sourceWarehouseId) {
+          throw new BadRequestException(
+            `Estoque insuficiente para "${product.name}". Verifique o saldo no seu depósito e na matriz.`,
+          );
+        }
+
+        // D. Executa a Baixa no Depósito Escolhido
+        await tx.stockItem.update({
           where: {
             productId_warehouseId: {
               productId: product.id,
-              warehouseId: warehouse.id,
+              warehouseId: sourceWarehouseId,
+            },
+          },
+          data: { quantity: { decrement: quantityToSell } },
+        });
+
+        // E. Registra Kardex
+        // Calcula o saldo após a movimentação
+        const stockAfterMovement = await tx.stockItem.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: product.id,
+              warehouseId: sourceWarehouseId,
             },
           },
         });
 
-        const currentQty = Number(stockItem?.quantity || 0);
-        const quantityToSell = Number(itemDto.quantity);
-
-        if (currentQty < quantityToSell) {
-          throw new BadRequestException(
-            `Estoque insuficiente para "${product.name}" no depósito "${warehouse.name}". Disponível: ${currentQty}`,
-          );
-        }
-
-        // 2. Decrementa saldo
-        if (!stockItem) {
-          throw new BadRequestException(
-            `Estoque do produto "${product.name}" não encontrado no depósito "${warehouse.name}".`,
-          );
-        }
-        await tx.stockItem.update({
-          where: { id: stockItem.id },
-          data: { quantity: { decrement: quantityToSell } },
-        });
-
-        // 3. Registra no Kardex (Movimentação)
         await tx.stockMovement.create({
           data: {
             tenantId,
             productId: product.id,
-            type: 'EXIT', // Saída por Venda
+            type: 'EXIT',
             quantity: quantityToSell,
-            reason: 'Venda (Pedido em processamento)', // Atualizaremos com o ID do pedido se necessário
-            fromWarehouseId: warehouse.id, // Rastreabilidade: Saiu daqui
+            reason: needsSeparation
+              ? 'Venda (Retirada na Matriz)'
+              : 'Venda (Pronta Entrega)',
+            fromWarehouseId: sourceWarehouseId,
             costPrice: product.costPrice,
-            balanceAfter: currentQty - quantityToSell,
             userId: user.id,
+            balanceAfter: stockAfterMovement
+              ? Number(stockAfterMovement.quantity)
+              : 0,
           },
         });
 
-        // --- CÁLCULO DE PREÇO (Lógica mantida) ---
+        // --- CÁLCULOS (Preço e Impostos) ---
         const priceObj = product.prices[0];
         let unitPrice = priceObj ? Number(priceObj.price) : 0;
 
-        if (unitPrice === 0) {
-          throw new BadRequestException(
-            `Produto ${product.name} sem preço na tabela selecionada.`,
-          );
-        }
+        if (unitPrice === 0)
+          throw new BadRequestException(`Produto ${product.name} sem preço.`);
 
         const itemDiscount = Number(itemDto.discount || 0);
         const totalItem = unitPrice * quantityToSell - itemDiscount;
@@ -174,13 +203,13 @@ export class SalesService {
         let icmsRate = 0;
         let ipiRate = 0;
 
+        // (Lógica de impostos mantida...)
         if (product.taxProfile) {
           let rule = product.taxProfile.rules.find(
             (r) =>
               r.originState === originState &&
               r.destinationState === destinationState,
           );
-
           if (!rule) {
             rule = product.taxProfile.rules.find(
               (r) =>
@@ -188,7 +217,6 @@ export class SalesService {
                 r.destinationState === originState,
             );
           }
-
           if (rule) {
             icmsRate = Number(rule.icmsRate);
             ipiRate = Number(rule.ipiRate);
@@ -215,13 +243,20 @@ export class SalesService {
 
       const finalTotal = subtotal + Number(shipping) - Number(discount);
 
-      // Cria o Pedido
+      // --- DEFINIÇÃO DO STATUS ---
+      // Se needsSeparation for true (Seller vendeu da matriz), status é SEPARATION.
+      // Caso contrário, é CONFIRMED (Venda normal).
+      const finalStatus = needsSeparation
+        ? OrderStatus.SEPARATION
+        : OrderStatus.CONFIRMED;
+
+      // Cria Pedido
       return tx.order.create({
         data: {
           tenantId,
           customerId,
           priceListId,
-          status: 'CONFIRMED', // Já confirmamos pois baixamos o estoque
+          status: finalStatus,
           subtotal,
           discount: Number(discount),
           shipping: Number(shipping),
@@ -239,15 +274,13 @@ export class SalesService {
       });
     });
 
-    // --- GERAÇÃO FINANCEIRA (Pós-Transação) ---
-    // Se der erro aqui, o pedido e o estoque já foram processados (Comercial OK, Financeiro Pendente)
-    // Isso é seguro pois permite reprocessar o financeiro depois se precisar.
+    // --- GERAÇÃO FINANCEIRA ---
     if (installments && installments.length > 0) {
       for (const inst of installments) {
         await this.financialService.createReceivable(
           {
             titleNumber: `PED-${order.code}/${inst.number}`,
-            description: `Venda Pedido #${order.code} - Parc ${inst.number}`,
+            description: `Venda Pedido #${order.code}`,
             amount: Number(inst.amount),
             dueDate: inst.dueDate,
             customerId: customerId,

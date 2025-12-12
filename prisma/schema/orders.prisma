@@ -1,9 +1,10 @@
 enum OrderStatus {
-  DRAFT // Rascunho (Em digitação)
-  CONFIRMED // Confirmado (Reserva estoque)
-  INVOICED // Faturado (Nota fiscal emitida)
+  DRAFT // Rascunho
+  CONFIRMED // Confirmado (Saiu do estoque do vendedor, vida que segue)
+  SEPARATION // A SEPARAR (Saiu da Matriz, o Seller precisa buscar ou o Admin despachar)
+  INVOICED // Faturado
   CANCELED // Cancelado
-  COMPLETED // Entregue/Finalizado
+  COMPLETED // Entregue
 }
 
 model Order {

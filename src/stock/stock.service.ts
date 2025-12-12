@@ -8,10 +8,15 @@ import {
   CreateStockMovementDto,
   MovementType,
 } from './dto/create-movement.dto';
+import { CreateTransferDto } from './dto/create-transfer.dto';
+import { NotificationsService } from 'src/notifications/notifications.service';
 
 @Injectable()
 export class StockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   // --- 1. HELPER: BUSCAR OU CRIAR MATRIZ ---
   async getOrCreateDefaultWarehouse(tenantId: string) {
@@ -38,12 +43,31 @@ export class StockService {
   }
 
   // --- 2. LISTAR DEPÓSITOS (Necessário para o Select do Front) ---
-  async getWarehouses(tenantId: string) {
+  async getWarehouses(user: any) {
+    const { tenantId, id: userId } = user;
     // Garante que a matriz existe antes de listar
     await this.getOrCreateDefaultWarehouse(tenantId);
 
+    let whereCondition: any = {};
+
+    if (user.role === 'SELLER') {
+      whereCondition = {
+        tenantId,
+        OR: [
+          {
+            isDefault: true, // Sempre traz a Matriz
+          },
+          {
+            responsibleUserId: userId,
+          },
+        ],
+      };
+    } else {
+      whereCondition = { tenantId };
+    }
+
     return this.prisma.warehouse.findMany({
-      where: { tenantId },
+      where: whereCondition,
       orderBy: { isDefault: 'desc' }, // Matriz primeiro
       include: {
         responsibleUser: { select: { name: true, email: true } }, // Mostra quem é o dono se houver
@@ -286,5 +310,326 @@ export class StockService {
     });
 
     return items;
+  }
+
+  async findStockByWarehouse(
+    tenantId: string,
+    warehouseId?: string,
+    search?: string,
+  ) {
+    const whereCondition: any = {
+      tenantId,
+      isActive: true,
+      // FILTRO ESSENCIAL: Ignora produtos que têm filhos (Pais).
+      // Resultado: Traz apenas Produtos Simples e Variantes (SKUs finais).
+      variants: { none: {} },
+      ...(warehouseId
+        ? {
+            stock: {
+              some: { warehouseId },
+            },
+          }
+        : {}),
+    };
+
+    // Se tiver busca por texto
+    if (search) {
+      whereCondition.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { sku: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const products = await this.prisma.product.findMany({
+      where: whereCondition,
+      include: {
+        stock: {
+          // Se um warehouseId foi especificado, trazemos APENAS o stock item daquele warehouse
+          where: warehouseId ? { warehouseId } : undefined,
+        },
+        images: { take: 1 },
+        // Removemos o include de 'variants', pois garantimos pelo filtro que eles não têm filhos
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    // Mapeamento simplificado
+    return products.map((p) => {
+      // Como removemos os pais, a lógica de soma é direta sobre o array 'stock' do próprio item
+      const totalQty = p.stock.reduce((acc, s) => acc + Number(s.quantity), 0);
+
+      return {
+        id: p.id,
+        name: p.name,
+        sku: p.sku,
+        unit: p.unit,
+        imageUrl: p.images[0]?.url,
+        quantity: totalQty,
+        variants: [], // Array vazio pois são itens finais
+      };
+    });
+  }
+
+  async createTransfer(
+    dto: CreateTransferDto,
+    userId: string,
+    tenantId: string,
+  ) {
+    const transfer = await this.prisma.stockTransfer.create({
+      data: {
+        tenantId,
+        requesterId: userId,
+        originId: dto.originWarehouseId,
+        destinationId: dto.destinationWarehouseId,
+        status: 'PENDING',
+        items: {
+          create: dto.items.map((i) => ({
+            productId: i.productId,
+            quantity: i.quantity,
+          })),
+        },
+      },
+      include: {
+        origin: { select: { name: true } },
+        destination: { select: { name: true } },
+        requester: { select: { name: true } },
+      },
+    });
+
+    this.notificationsService.send({
+      tenantId,
+      type: 'stock', // <--- Tipo correto para ícone de caixa/estoque
+      title: 'Solicitação de Transferência',
+      message: `O vendedor ${transfer.requester.name} está solicitando ajuste de estoque De ${transfer.origin.name} para ${transfer.destination.name}`,
+      link: `/registrations/stock?transferId=${transfer.id}`, // Link para a tela de transferências
+      actionLabel: 'Analisar',
+      metadata: {
+        id: transfer.id,
+        originId: transfer.originId,
+      },
+      targetRoles: ['ADMIN', 'OWNER'],
+    });
+
+    return transfer;
+  }
+
+  async findAllTransfers(user: any, tenantId: string) {
+    const whereCondition: any = {
+      tenantId, // IMPORTANTE: Sempre filtrar pelo Tenant
+    };
+
+    // Se for SELLER, filtrar onde ele pediu OU onde ele é o dono do destino
+    if (user.role === 'SELLER') {
+      whereCondition.OR = [
+        { requesterId: user.id },
+        {
+          destination: {
+            responsibleUserId: user.id,
+          },
+        },
+      ];
+    }
+
+    return this.prisma.stockTransfer.findMany({
+      where: whereCondition,
+      include: {
+        origin: { select: { id: true, name: true } },
+        destination: { select: { id: true, name: true } },
+
+        requester: { select: { name: true } },
+
+        items: {
+          include: {
+            product: { select: { name: true, sku: true, unit: true } },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async approveTransfer(transferId: string, userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const transfer = await tx.stockTransfer.findUnique({
+        where: { id: transferId },
+        include: { items: true, origin: true },
+      });
+
+      if (!transfer) {
+        throw new NotFoundException('Transferência não encontrada.');
+      }
+
+      if (transfer.status !== 'PENDING')
+        throw new BadRequestException('Status inválido.');
+
+      // CORREÇÃO: Buscamos quem está aprovando AGORA para pegar o nome
+      const approver = await tx.user.findUnique({
+        where: { id: userId },
+        select: { name: true },
+      });
+
+      // 1. Processa cada item (Saída da Origem)
+      for (const item of transfer.items) {
+        // Verifica saldo na Origem
+        const stockOrigin = await tx.stockItem.findUnique({
+          where: {
+            productId_warehouseId: {
+              productId: item.productId,
+              warehouseId: transfer.originId,
+            },
+          },
+        });
+
+        if (
+          !stockOrigin ||
+          Number(stockOrigin.quantity) < Number(item.quantity)
+        ) {
+          throw new BadRequestException(
+            `Saldo insuficiente na origem para o produto ${item.productId}`,
+          );
+        }
+
+        // Baixa na Origem
+        await tx.stockItem.update({
+          where: { id: stockOrigin.id },
+          data: { quantity: { decrement: item.quantity } },
+        });
+
+        // Registra Kardex (SAÍDA DE TRÂNSITO)
+        await tx.stockMovement.create({
+          data: {
+            tenantId: transfer.tenantId,
+            productId: item.productId,
+            fromWarehouseId: transfer.originId, // Saiu daqui
+            type: 'EXIT',
+            reason: `Transferência #${transfer.code} (Em Trânsito)`,
+            quantity: item.quantity,
+            userId,
+            balanceAfter: Number(stockOrigin.quantity) - Number(item.quantity),
+          },
+        });
+      }
+
+      this.notificationsService.send({
+        tenantId: transfer.tenantId,
+        type: 'stock',
+        title: 'Pedido de Transferência Aprovado',
+        message: `O seu pedido #${transfer.code} de transferência de estoque foi aprovado por ${approver?.name || 'Administrador'}`,
+        link: `/registrations/stock`,
+        actionLabel: 'Analisar',
+        metadata: {
+          id: transfer.id,
+          originId: transfer.originId,
+        },
+        targetRoles: ['SELLER'],
+      });
+
+      // Atualiza Status
+      return tx.stockTransfer.update({
+        where: { id: transferId },
+        data: {
+          status: 'IN_TRANSIT',
+          approvedByUserId: userId,
+        },
+      });
+    });
+  }
+
+  async completeTransfer(transferId: string, userId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const transfer = await tx.stockTransfer.findUnique({
+        where: { id: transferId },
+        include: { items: true, destination: true },
+      });
+
+      if (!transfer) {
+        throw new NotFoundException('Transferência não encontrada.');
+      }
+
+      if (transfer.status !== 'IN_TRANSIT')
+        throw new BadRequestException('Transferência não está em trânsito.');
+
+      // 1. Processa cada item (Entrada no Destino)
+      for (const item of transfer.items) {
+        // Busca ou Cria StockItem no Destino
+        const stockDest = await tx.stockItem.upsert({
+          where: {
+            productId_warehouseId: {
+              productId: item.productId,
+              warehouseId: transfer.destinationId,
+            },
+          },
+          create: {
+            productId: item.productId,
+            warehouseId: transfer.destinationId,
+            quantity: item.quantity,
+            minStock: 0,
+            maxStock: 0,
+          },
+          update: {
+            quantity: { increment: item.quantity },
+          },
+        });
+
+        // Registra Kardex (ENTRADA DE TRÂNSITO)
+        await tx.stockMovement.create({
+          data: {
+            tenantId: transfer.tenantId,
+            productId: item.productId,
+            toWarehouseId: transfer.destinationId, // Entrou aqui
+            type: 'ENTRY',
+            reason: `Recebimento Transferência #${transfer.code}`,
+            quantity: item.quantity,
+            userId,
+            balanceAfter: Number(stockDest.quantity),
+          },
+        });
+      }
+
+      // Finaliza
+      return tx.stockTransfer.update({
+        where: { id: transferId },
+        data: {
+          status: 'COMPLETED',
+          receivedByUserId: userId,
+        },
+      });
+    });
+  }
+
+  async updateStockByProductId(
+    productId: string,
+    warehouseId: string,
+    quantity: number,
+    reason: string,
+    userId: string,
+    tenantId: string,
+  ) {
+    const stockItems = await this.prisma.stockItem.findMany({
+      where: { productId, warehouseId: warehouseId },
+    });
+
+    return this.prisma.$transaction(
+      stockItems.map(
+        (item) =>
+          this.prisma.stockItem.update({
+            where: { id: item.id },
+            data: { quantity: quantity + Number(item.quantity) },
+          }),
+
+        this.prisma.stockMovement.create({
+          data: {
+            tenantId,
+            productId,
+            type: MovementType.ENTRY,
+            quantity,
+            reason: reason || 'Ajuste',
+            costPrice: 0,
+            balanceAfter: quantity,
+            userId,
+          },
+        }),
+      ),
+    );
   }
 }

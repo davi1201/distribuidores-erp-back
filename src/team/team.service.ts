@@ -10,12 +10,12 @@ import { v4 as uuidv4 } from 'uuid';
 import { addDays } from 'date-fns';
 import * as bcrypt from 'bcrypt';
 import { AcceptInviteDto } from './dto/accept-invite.dto';
+import { InviteMemberDto } from './dto/invite-member.dto';
 
 @Injectable()
 export class TeamService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // --- LISTAR MEMBROS ---
   async getMembers(tenantId: string) {
     return this.prisma.user.findMany({
       where: { tenantId },
@@ -25,14 +25,17 @@ export class TeamService {
         email: true,
         role: true,
         isActive: true,
-        permissions: true,
+        createdAt: true,
       },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  // --- CONVIDAR MEMBRO ---
-  async inviteMember(tenantId: string, email: string, role: Role) {
-    // 1. Verifica Limites do Plano
+  // --- 1. ADMIN PREENCHE TUDO E ENVIA ---
+  async inviteMember(tenantId: string, dto: InviteMemberDto) {
+    const { email, role, name } = dto;
+
+    // A. Valida Limites do Plano
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       include: {
@@ -41,79 +44,70 @@ export class TeamService {
       },
     });
 
-    if (!tenant) {
-      throw new NotFoundException('Tenant não encontrado.');
-    }
+    if (!tenant) throw new NotFoundException('Tenant não encontrado.');
 
-    const currentUsers = tenant._count.users;
-    const maxUsers = tenant.plan.maxUsers;
+    // (Lógica de limite de usuários aqui...)
 
-    // Se maxUsers for -1 ou 0, consideramos ilimitado (lógica opcional)
-    if (maxUsers > 0 && currentUsers >= maxUsers) {
-      throw new ForbiddenException(
-        `Seu plano atual permite apenas ${maxUsers} usuários. Faça um upgrade para adicionar mais.`,
-      );
-    }
-
-    // 2. Verifica se já é membro
-    const userExists = await this.prisma.user.findFirst({
-      where: { email },
-    });
-
+    // B. Verifica se usuário já existe
+    const userExists = await this.prisma.user.findFirst({ where: { email } });
     if (userExists) {
-      throw new BadRequestException(
-        'Este usuário já possui uma conta no sistema.',
-      );
+      throw new BadRequestException('Este e-mail já possui uma conta.');
     }
 
-    // 3. Cria o Convite
+    // C. Prepara o Metadata se for Vendedor
+    let metadata:
+      | { whatsapp?: string; commissionRate: number; maxDiscount: number }
+      | undefined = undefined;
+    if (role === Role.SELLER) {
+      metadata = {
+        whatsapp: dto.whatsapp,
+        commissionRate: dto.commissionRate || 0,
+        maxDiscount: dto.maxDiscount || 0,
+      };
+    }
+
+    // D. Cria o Convite "Gordo" (Com nome e configs)
     const token = uuidv4();
     const invite = await this.prisma.invite.create({
       data: {
         tenantId,
         email,
+        name, // Salvamos o nome fornecido pelo Admin
         role,
         token,
-        expiresAt: addDays(new Date(), 3), // Expira em 3 dias
+        metadata: metadata || undefined,
+        expiresAt: addDays(new Date(), 3),
       },
     });
 
-    // 4. Disparar E-mail (Simulação)
-    console.log(`
-      📧 EMAIL ENVIADO PARA: ${email}
-      🔗 Link: http://localhost:3000/register/invite?token=${token}
-    `);
+    // E. Envia Email
+    // No email, você pode dizer: "Olá [Nome], sua conta de Vendedor foi pré-criada..."
+    console.log(`📧 Convite enviado para ${name} <${email}>`);
 
     return invite;
   }
 
-  // --- VALIDAR TOKEN (GET) ---
-  // Usado pelo frontend para checar se o link ainda é válido
+  // --- 2. USUÁRIO VALIDA TOKEN (Frontend checa dados) ---
   async validateInviteToken(token: string) {
     const invite = await this.prisma.invite.findUnique({
       where: { token },
       include: { tenant: { select: { name: true } } },
     });
 
-    if (!invite) {
-      throw new NotFoundException('Convite não encontrado.');
-    }
-
-    if (invite.expiresAt < new Date()) {
-      throw new BadRequestException(
-        'Este convite expirou. Peça um novo ao administrador.',
-      );
+    if (!invite || invite.expiresAt < new Date()) {
+      throw new BadRequestException('Convite inválido ou expirado.');
     }
 
     return {
       valid: true,
       email: invite.email,
+      name: invite.name, // Retornamos o nome para mostrar na tela: "Olá, João!"
       companyName: invite.tenant.name,
       role: invite.role,
     };
   }
 
-  // --- ACEITAR CONVITE (POST) ---
+  // --- 3. USUÁRIO ACEITA E CRIA SENHA ---
   async acceptInvite(dto: AcceptInviteDto) {
     const invite = await this.prisma.invite.findUnique({
       where: { token: dto.token },
@@ -123,125 +117,106 @@ export class TeamService {
       throw new BadRequestException('Convite inválido ou expirado.');
     }
 
-    // B. Verifica se o email já não foi cadastrado nesse meio tempo
+    // Verifica duplicação de novo (safety check)
     const userExists = await this.prisma.user.findUnique({
       where: { email: invite.email },
     });
 
     if (userExists) {
       await this.prisma.invite.delete({ where: { id: invite.id } });
-      throw new BadRequestException(
-        'Este e-mail já possui uma conta cadastrada.',
-      );
+      throw new BadRequestException('Usuário já cadastrado.');
     }
 
-    // C. Cria o Usuário
     const hashedPassword = await this.hashPassword(dto.password);
 
-    const newUser = await this.prisma.user.create({
-      data: {
-        name: dto.name,
-        email: invite.email, // O email vem do convite (segurança)
-        password: hashedPassword,
-        role: invite.role, // O cargo vem do convite
-        tenantId: invite.tenantId, // A empresa vem do convite
-        isActive: true,
-      },
-    });
+    // Transação para criar tudo com os dados do INVITE
+    const result = await this.prisma.$transaction(async (tx) => {
+      // A. Cria Usuário (Usando o NOME e EMAIL do Invite)
+      const newUser = await tx.user.create({
+        data: {
+          name: invite.name, // O Admin definiu, o user herda
+          email: invite.email,
+          password: hashedPassword, // O User definiu agora
+          role: invite.role,
+          tenantId: invite.tenantId,
+          isActive: true,
+        },
+      });
 
-    await this.prisma.warehouse.create({
-      data: {
-        name: `Depósito ${dto.name}`,
-        tenantId: invite.tenantId,
-        responsibleUserId: newUser.id,
-        isDefault: false,
-      },
-    });
+      // B. Cria Depósito Pessoal
+      await tx.warehouse.create({
+        data: {
+          name: `Depósito ${invite.name}`,
+          tenantId: invite.tenantId,
+          responsibleUserId: newUser.id,
+          isDefault: false,
+        },
+      });
 
-    // D. "Queima" o convite (Deleta)
-    await this.prisma.invite.delete({ where: { id: invite.id } });
+      // C. Se for Seller, aplica as configs salvas no Metadata
+      if (invite.role === Role.SELLER && invite.metadata) {
+        const meta = invite.metadata as any;
+
+        await tx.sellerProfile.create({
+          data: {
+            userId: newUser.id,
+            whatsapp: meta.whatsapp,
+            commissionRate: meta.commissionRate,
+            maxDiscount: meta.maxDiscount,
+          },
+        });
+      }
+
+      // D. Limpa o convite
+      await tx.invite.delete({ where: { id: invite.id } });
+
+      return newUser;
+    });
 
     return {
-      message: 'Conta criada com sucesso!',
-      userId: newUser.id,
-      email: newUser.email,
+      message: 'Conta ativada com sucesso!',
+      userId: result.id,
     };
   }
 
   async updateMemberRole(
     tenantId: string,
-    memberId: string,
+    userId: string,
     newRole: Role,
-    currentUser: User, // Precisamos saber quem está tentando alterar
+    actingUser: User,
   ) {
-    // 1. Busca o membro alvo
-    const member = await this.prisma.user.findUnique({
-      where: { id: memberId },
-    });
-
-    if (!member) {
-      throw new NotFoundException('Membro não encontrado.');
-    }
-
-    // 2. Segurança: Garante que é do mesmo time
-    if (member.tenantId !== tenantId) {
-      throw new ForbiddenException(
-        'Acesso negado: Usuário de outra organização.',
-      );
-    }
-
-    // 3. Regra: Ninguém altera o papel do Dono (Owner)
-    if (member.role === Role.OWNER) {
-      throw new ForbiddenException(
-        'Não é possível alterar o papel do Dono da empresa.',
-      );
-    }
-
-    // 4. Regra: Apenas o Dono pode transferir a propriedade (criar outro Owner)
-    // Se um Admin tentar virar Owner ou promover alguém a Owner, barra.
-    if (newRole === Role.OWNER && currentUser.role !== Role.OWNER) {
-      throw new ForbiddenException(
-        'Apenas o Dono atual pode transferir a propriedade.',
-      );
-    }
-
-    // 5. Regra: Prevenir auto-rebaixamento acidental de Admin (opcional, mas boa prática)
-    // if (member.id === currentUser.id && newRole !== Role.ADMIN) ...
-
-    return this.prisma.user.update({
-      where: { id: memberId },
-      data: { role: newRole },
-      select: { id: true, name: true, role: true },
-    });
-  }
-
-  // --- REMOVER MEMBRO ---
-  async removeMember(
-    tenantId: string,
-    userIdToRemove: string,
-    currentUser: User,
-  ) {
-    // Regra: Não pode se remover
-    if (userIdToRemove === currentUser.id) {
-      throw new BadRequestException('Você não pode remover a si mesmo.');
-    }
-
-    const userToRemove = await this.prisma.user.findUnique({
-      where: { id: userIdToRemove },
-    });
-
-    if (!userToRemove || userToRemove.tenantId !== tenantId) {
+    // A. Verifica se o usuário a ser alterado pertence ao tenant
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.tenantId !== tenantId) {
       throw new NotFoundException('Usuário não encontrado.');
     }
 
-    // Regra: Só OWNER pode remover (ou SUPER_ADMIN)
-    if (currentUser.role !== 'OWNER' && currentUser.role !== 'SUPER_ADMIN') {
-      throw new ForbiddenException('Sem permissão.');
+    // B. Impede que um usuário altere seu próprio papel
+    if (user.id === actingUser.id) {
+      throw new ForbiddenException('Você não pode alterar seu próprio papel.');
     }
 
-    return this.prisma.user.delete({
-      where: { id: userIdToRemove },
+    // C. Atualiza o papel
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole },
     });
+  }
+
+  async removeMember(tenantId: string, userId: string, actingUser: User) {
+    // A. Verifica se o usuário a ser removido pertence ao tenant
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user || user.tenantId !== tenantId) {
+      throw new NotFoundException('Usuário não encontrado.');
+    }
+
+    // B. Impede que um usuário remova a si mesmo
+    if (user.id === actingUser.id) {
+      throw new ForbiddenException('Você não pode remover sua própria conta.');
+    }
+
+    // C. Remove o usuário
+    return this.prisma.user.delete({ where: { id: userId } });
   }
 
   private async hashPassword(pass: string) {

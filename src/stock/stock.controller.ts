@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { StockService } from './stock.service';
 import { CreateStockMovementDto } from './dto/create-movement.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,6 +15,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { TransferStockDto } from './dto/transfer-stock.dto';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
+import { CreateTransferDto } from './dto/create-transfer.dto';
 
 @Controller('stock')
 @UseGuards(JwtAuthGuard)
@@ -25,12 +35,26 @@ export class StockController {
     );
   }
 
-  @Post('transfer')
-  async transferStock(
-    @Body() dto: TransferStockDto,
-    @CurrentUser() user: User,
-  ) {
-    return this.stockService.transferStock(user.tenantId ?? '', user.id, dto);
+  @Post('transfers')
+  createTransfer(@Body() dto: CreateTransferDto, @CurrentUser() user: User) {
+    return this.stockService.createTransfer(dto, user.id, user.tenantId || '');
+  }
+
+  @Get('transfers')
+  findAllTransfers(@CurrentUser() user: User) {
+    // Se for SELLER, filtrar onde requesterId == user.id OU destination.responsibleUserId == user.id
+    return this.stockService.findAllTransfers(user, user.tenantId || '');
+  }
+
+  @Patch('transfers/:id/approve')
+  approveTransfer(@Param('id') id: string, @CurrentUser() user: User) {
+    // Verificar permissão ADMIN/MANAGER
+    return this.stockService.approveTransfer(id, user.id);
+  }
+
+  @Patch('transfers/:id/complete')
+  completeTransfer(@Param('id') id: string, @CurrentUser() user) {
+    return this.stockService.completeTransfer(id, user.id);
   }
 
   // 3. Criar Depósito Móvel (Geralmente chamado ao cadastrar um vendedor)
@@ -60,6 +84,19 @@ export class StockController {
 
   @Get('warehouses')
   async getWarehouses(@CurrentUser() user: User) {
-    return this.stockService.getWarehouses(user.tenantId || '');
+    return this.stockService.getWarehouses(user);
+  }
+
+  @Get('products')
+  findAll(
+    @CurrentUser() user: User,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.stockService.findStockByWarehouse(
+      user.tenantId || '',
+      warehouseId,
+      search,
+    );
   }
 }
