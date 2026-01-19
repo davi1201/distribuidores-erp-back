@@ -7,6 +7,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { XMLParser } from 'fast-xml-parser';
 import { ProductsService } from '../products/products.service';
 import { StockService } from 'src/stock/stock.service';
+import { FinancialService } from '../financial/financial.service'; // Importação do Financial
 import type { User } from '@prisma/client';
 
 type ParsedItem = {
@@ -31,17 +32,19 @@ export class NfeService {
     private readonly prisma: PrismaService,
     private readonly productsService: ProductsService,
     private readonly stockService: StockService,
+    private readonly financialService: FinancialService, // Injeção
   ) {}
 
   // -------------------- Helpers de Texto --------------------
   private cleanProductName(name: string): string {
     return name
       .toUpperCase()
-      .replace(/\s+-\s+/g, ' ')
-      .replace(/\b\d+([.,]\d+)?\s*(ML|L|G|KG|MG|M|MM|CM|UN|PC|CX)\b/gi, '')
-      .replace(/[^\p{L}0-9\s]/gu, '') // Ajustado regex para aceitar números também
-      .replace(/\s+/g, ' ')
-      .trim();
+      .replace(/\s+-\s+/g, ' ') // Remove ' - ' extra
+      .replace(/\b\d+([.,]\d+)?\s*(ML|L|G|KG|MG|M|MM|CM|UN|PC|CX)\b/gi, '') // Remove medidas com números
+      .replace(/\d+/g, '') // **Remove todos os números**
+      .replace(/[^\p{L}\s]/gu, '') // Permite apenas letras e espaços
+      .replace(/\s+/g, ' ') // Normaliza múltiplos espaços
+      .trim(); // Trim final
   }
 
   private extractVariantName(
@@ -71,6 +74,39 @@ export class NfeService {
     return intersection.length / union.size;
   }
 
+  private generateSmartSku(name: string, originalCode: string): string {
+    const cleanName = name.toUpperCase().trim();
+
+    // 1. Prefixo (3 letras iniciais)
+    // Remove palavras comuns inúteis para SKU como "O", "A", "DE", "PARA"
+    const words = cleanName.split(' ').filter((w) => w.length > 2);
+    const prefix = (words[0] || cleanName)
+      .substring(0, 3)
+      .replace(/[^A-Z]/g, 'PRD');
+
+    const measureRegex =
+      /\b\d+([.,]\d+)?\s*(ML|L|G|KG|MG|M|MM|CM|V|W|UN|PC)\b/i;
+    const measureMatch = cleanName.match(measureRegex);
+    let measure = '';
+
+    if (measureMatch) {
+      // Remove espaços e padroniza ponto
+      measure = measureMatch[0]
+        .toUpperCase()
+        .replace(/\s/g, '')
+        .replace(',', '.');
+    }
+
+    // 3. Sufixo (Últimos 4 digitos do código original para evitar colisão)
+    // Se o código original for curto, usa ele todo
+    const cleanCode = originalCode.replace(/[^a-zA-Z0-9]/g, '');
+    const suffix = cleanCode.length > 4 ? cleanCode.slice(-4) : cleanCode;
+
+    // Montagem: PREFIXO-MEDIDA-SUFIXO ou PREFIXO-SUFIXO
+    const parts = [prefix, measure, suffix].filter(Boolean);
+    return parts.join('-');
+  }
+
   // -------------------- Parser XML --------------------
   async parseNfeXml(fileBuffer: Buffer) {
     const parser = new XMLParser({
@@ -88,11 +124,27 @@ export class NfeService {
     const infNFe = nfeProc?.NFe?.infNFe;
     if (!infNFe) throw new BadRequestException('Estrutura NFe não encontrada.');
 
+    // Tratamento de array unitário
+    const detArray = Array.isArray(infNFe.det) ? infNFe.det : [infNFe.det];
+
+    // Cálculo robusto do total (caso falte a tag <total>)
+    const calculatedProductsTotal = detArray.reduce(
+      (acc: number, curr: any) => {
+        return acc + (Number(curr.prod?.vProd) || 0);
+      },
+      0,
+    );
+
+    const xmlTotal = Number(infNFe.total?.ICMSTot?.vNF);
+    const finalTotalAmount =
+      !isNaN(xmlTotal) && xmlTotal > 0 ? xmlTotal : calculatedProductsTotal;
+
     const nfeData = {
       accessKey: nfeProc?.protNFe?.infProt?.chNFe || '',
       number: infNFe.ide?.nNF,
       series: infNFe.ide?.serie,
       issueDate: infNFe.ide?.dhEmi,
+      totalAmount: finalTotalAmount,
     };
 
     const emit = infNFe.emit;
@@ -110,21 +162,32 @@ export class NfeService {
       ibgeCode: String(emit?.enderEmit?.cMun || ''),
     };
 
-    const detArray = Array.isArray(infNFe.det) ? infNFe.det : [infNFe.det];
-
     const products: ParsedItem[] = await Promise.all(
       detArray.map(async (det: any, index: number) => {
         const prod = det.prod;
-        // Tenta achar produto pelo SKU (Código do fornecedor ou interno)
-        const found = await this.prisma.product.findFirst({
-          where: { sku: prod.cProd },
-          select: { id: true, sku: true },
-        });
+        const cProd = String(prod.cProd); // FIX: Converte forçadamente para String para evitar erro do Prisma com números (Ex: "96")
+
+        // Verifica se já existe pelo código de fornecedor (cProd)
+        const foundByCode =
+          (await this.prisma.product.findFirst({
+            where: { supplier: { supplierProductCode: cProd } }, // Ideal: Busca pelo código do fornecedor no relacionamento
+            select: { id: true, sku: true },
+          })) ||
+          (await this.prisma.product.findFirst({
+            where: { sku: cProd }, // Fallback: Busca pelo SKU direto
+            select: { id: true, sku: true },
+          }));
+
+        // Gera SKU inteligente se não encontrou produto existente
+        const smartSku = foundByCode
+          ? foundByCode.sku
+          : this.generateSmartSku(prod.xProd, cProd);
 
         return {
           index,
-          code: prod.cProd,
-          ean: prod.cEAN !== 'SEM GTIN' ? prod.cEAN : null,
+          code: smartSku, // SKU sugerido para o sistema (ex: SHA-500ML-1234)
+          supplierCode: cProd, // Código original (ex: 1234)
+          ean: prod.cEAN !== 'SEM GTIN' ? String(prod.cEAN) : null,
           name: prod.xProd,
           ncm: prod.NCM ? String(prod.NCM) : undefined,
           cfop: prod.CFOP ? String(prod.CFOP) : undefined,
@@ -132,17 +195,16 @@ export class NfeService {
           quantity: Number(prod.qCom) || 0,
           unitPrice: Number(prod.vUnCom) || 0,
           totalPrice: Number(prod.vProd) || undefined,
-          suggestedAction: found ? 'LINK_EXISTING' : 'NEW',
-          id: found ? found.id : null,
+          suggestedAction: foundByCode ? 'LINK_EXISTING' : 'NEW',
+          id: foundByCode ? foundByCode.id : null,
           suggestedTargetIndex: null,
         };
       }),
     );
 
-    // Detecção de variantes
+    // Detecção de variantes (Agrupamento inteligente)
     for (let i = 0; i < products.length; i++) {
       const current = products[i];
-      // FIX 1: Se já existe (found), não tente sugerir agrupamento
       if (current.id) continue;
 
       for (let j = 0; j < i; j++) {
@@ -150,6 +212,9 @@ export class NfeService {
         if (this.calculateSimilarity(current.name, candidate.name) > 0.8) {
           current.suggestedAction = 'LINK_XML_INDEX';
           current.suggestedTargetIndex = j;
+          // Se for variante, sugere SKU seguindo o pai: PAI-VAR
+          // Ex: Pai SHA-500ML-1234 -> Variante SHA-500ML-1234-V2 (Lógica simples, o usuário refina no front)
+          current.code = `${candidate.code}-V${i}`;
           break;
         }
       }
@@ -160,7 +225,7 @@ export class NfeService {
 
   // -------------------- Importação (Core) --------------------
   async importNfe(payload: any, tenantId: string, user: User) {
-    const { supplier, products, nfe, mappings } = payload;
+    const { supplier, products, nfe, mappings, financial } = payload;
     supplier.document = supplier.document?.toString?.() ?? '';
 
     // 1. Garante fornecedor
@@ -179,11 +244,11 @@ export class NfeService {
 
     const createdParentsMap: Record<number, string> = {};
 
-    // 4. Loop de Processamento
+    // 4. Loop de Processamento (Mantido sem alterações na lógica de produtos)
     for (let i = 0; i < products.length; i++) {
       const item: ParsedItem = products[i];
       const mapping = mappings?.[item.index] ?? { action: 'NEW' };
-      const defaultMarkupPct = 100;
+      const defaultMarkupPct = mapping.markup ?? 100;
 
       const baseProductDto = {
         unit: item.unit,
@@ -195,10 +260,8 @@ export class NfeService {
         prices: priceLists.map((pl) => {
           const markup = item.unitPrice * (defaultMarkupPct / 100);
           const basePrice = item.unitPrice + markup;
-
           const adjustment =
             basePrice * (Number(pl.percentageAdjustment) / 100);
-
           return {
             priceListId: pl.id,
             price: basePrice + adjustment,
@@ -211,7 +274,6 @@ export class NfeService {
         },
       };
 
-      // --- CENÁRIO A: VINCULAR A PRODUTO EXISTENTE ---
       if (item.id) {
         await this.handleExistingProductUpdate(
           tenantId,
@@ -225,7 +287,6 @@ export class NfeService {
         continue;
       }
 
-      // --- CENÁRIO B: CRIAR NOVO PRODUTO ---
       if (mapping.action === 'NEW') {
         const isLeader = Object.values(mappings).some(
           (m: any) =>
@@ -237,12 +298,11 @@ export class NfeService {
           const variantName =
             this.extractVariantName(item.name, cleanName) ?? item.name;
 
-          // Cria Pai
           const parentProduct = await this.productsService.create(
             {
               ...baseProductDto,
               name: cleanName,
-              sku: `GRP-${item.code}`,
+              sku: this.generateSmartSku(cleanName, item.code),
               stock: null,
               prices: [],
               supplier: null,
@@ -250,9 +310,9 @@ export class NfeService {
             tenantId,
             user,
           );
+
           createdParentsMap[item.index] = parentProduct.id;
 
-          // Cria Variante
           const variant = await this.productsService.create(
             {
               ...baseProductDto,
@@ -274,7 +334,6 @@ export class NfeService {
             user.id,
           );
         } else {
-          // Produto Simples
           const created = await this.productsService.create(
             { ...baseProductDto, name: item.name, sku: item.code } as any,
             tenantId,
@@ -289,9 +348,7 @@ export class NfeService {
             user.id,
           );
         }
-      }
-      // --- CENÁRIO C: VINCULAR A PAI CRIADO NA NOTA ---
-      else if (mapping.action === 'LINK_XML_INDEX') {
+      } else if (mapping.action === 'LINK_XML_INDEX') {
         const parentIndex = mapping.targetIndex;
         const parentId =
           createdParentsMap[parentIndex] ?? products[parentIndex]?.id;
@@ -325,7 +382,72 @@ export class NfeService {
       }
     }
 
-    return { success: true, processed: products.length };
+    // 5. GERAÇÃO AUTOMÁTICA DE CONTAS A PAGAR (INTEGRAÇÃO ATUALIZADA)
+    if (financial?.generate) {
+      const totalAmount = Number(nfe.totalAmount) || 0;
+      let installmentsPlan: any[] = [];
+      const startDate: Date | string = new Date(); // Data base para cálculo (Hoje)
+
+      // Se o frontend enviar um ID de PaymentTerm, passamos para o service
+      const paymentTermId = financial.paymentTermId;
+
+      // Se NÃO tiver paymentTermId, montamos o plano com base na configuração manual (fallback/A Combinar)
+      if (!paymentTermId) {
+        const entryAmount = Number(financial.entryAmount || 0);
+        const installmentsCount = Number(financial.installmentsCount || 1);
+        const daysInterval = Number(financial.daysInterval || 30);
+        // Se houver data específica para primeira parcela, calculamos o delay em dias
+        const firstDueDate = financial.firstDueDate
+          ? new Date(financial.firstDueDate)
+          : new Date();
+
+        // 1. Regra da Entrada
+        if (entryAmount > 0) {
+          installmentsPlan.push({
+            days: 0,
+            fixedAmount: entryAmount,
+            percent: 0,
+          });
+        }
+
+        // 2. Regras das Parcelas (Restante)
+        const remainingAmount = totalAmount - entryAmount;
+        if (remainingAmount > 0 && installmentsCount > 0) {
+          // Calcula a proporção de cada parcela em relação ao TOTAL da nota
+          // O FinancialService usará essa % para calcular o valor
+          const installmentValue = remainingAmount / installmentsCount;
+          const installmentPercent = (installmentValue / totalAmount) * 100;
+
+          // Calcula dias de atraso inicial (ex: user escolheu vencimento para daqui 15 dias)
+          const diffTime = firstDueDate.getTime() - new Date().getTime();
+          const startDelayDays = Math.ceil(diffTime / (1000 * 3600 * 24));
+          const safeStartDelay = startDelayDays > 0 ? startDelayDays : 0;
+
+          for (let i = 0; i < installmentsCount; i++) {
+            installmentsPlan.push({
+              days: safeStartDelay + i * daysInterval,
+              percent: Number(installmentPercent.toFixed(4)),
+            });
+          }
+        }
+      }
+
+      await this.financialService.generatePayablesFromImport(
+        tenantId,
+        user.id,
+        {
+          importId: nfe.accessKey || `NFE-${nfe.number}`,
+          supplierId: supplierDb.id,
+          totalAmount,
+          invoiceNumber: String(nfe.number),
+          paymentMethod: financial.paymentMethod,
+          // Passamos o ID ou o Plano Manual construído
+          paymentTermId,
+          installmentsPlan,
+          startDate,
+        },
+      );
+    }
   }
 
   // -------------------- Helpers de Banco de Dados --------------------
@@ -408,7 +530,6 @@ export class NfeService {
         data: { costPrice: avgCost },
       });
 
-      // Se tiver índice, use upsert. Se não, use lógica manual find/create para evitar 42P10
       const stockUpsert = await tx.stockItem.upsert({
         where: { productId_warehouseId: { productId, warehouseId } },
         create: {
@@ -442,7 +563,12 @@ export class NfeService {
           const newSellingPrice = avgCost * (1 + currentMarkup / 100);
           await tx.productPrice.upsert({
             where: { productId_priceListId: { productId, priceListId: pl.id } },
-            create: { productId, priceListId: pl.id, price: newSellingPrice },
+            create: {
+              productId,
+              priceListId: pl.id,
+              price: newSellingPrice,
+              tenantId,
+            },
             update: { price: newSellingPrice },
           });
         }
@@ -488,7 +614,7 @@ export class NfeService {
     });
   }
 
-  // --- MÉTODOS DO INBOX (AJUSTADO) ---
+  // --- MÉTODOS DO INBOX ---
 
   async getInbox(tenantId: string) {
     return this.prisma.nfeInbox.findMany({
@@ -519,7 +645,6 @@ export class NfeService {
       throw new BadRequestException('Esta nota já foi processada.');
     }
 
-    // Reutiliza o parser existente para transformar o XML do banco em objeto para o front
     const parsedData = await this.parseNfeXml(
       Buffer.from(item.xmlContent, 'utf-8'),
     );

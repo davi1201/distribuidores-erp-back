@@ -17,9 +17,10 @@ import { UpdateSupplierDto } from './dto/update-supplier.dto'; // Crie este arqu
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('suppliers')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class SuppliersController {
   constructor(private readonly suppliersService: SuppliersService) {}
 

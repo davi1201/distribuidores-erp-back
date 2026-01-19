@@ -3,31 +3,25 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class BillingGuard implements CanActivate {
+  private readonly logger = new Logger(BillingGuard.name);
+
   constructor(
     private prisma: PrismaService,
     private reflector: Reflector,
   ) {}
 
-  async checkBillingProfile(tenantId: string) {
-    const profile = await this.prisma.billingProfile.findUnique({
-      where: { tenantId },
-    });
-
-    const isComplete = !!profile?.document && !!profile?.zipCode;
-
-    return { isComplete };
-  }
-
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
+    // 1. Pular verificação (Decorators ou Super Admin)
     const skipBilling = this.reflector.get<boolean>(
       'skipBilling',
       context.getHandler(),
@@ -37,12 +31,12 @@ export class BillingGuard implements CanActivate {
     if (!user || user.role === 'SUPER_ADMIN') return true;
     if (!user.tenantId) return false;
 
-    // 1. Busca Tenant e Assinaturas
+    // 2. Busca Tenant e a Assinatura (Sincronizada via Webhook)
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: user.tenantId },
       include: {
         subscriptions: {
-          orderBy: { createdAt: 'desc' }, // Pega a mais recente primeiro
+          orderBy: { createdAt: 'desc' },
           take: 1,
         },
       },
@@ -51,43 +45,56 @@ export class BillingGuard implements CanActivate {
     if (!tenant) return false;
 
     const now = new Date();
+    const latestSub = tenant.subscriptions[0];
 
-    // 2. Verifica Assinatura Ativa (Gateway)
-    // Regra: Status ATIVO e Data de fim no futuro (ou null se for vitalício)
-    const latestSubscription = tenant.subscriptions[0];
-    const hasActiveSubscription =
-      latestSubscription &&
-      ['ACTIVE', 'TRIALING'].includes(latestSubscription.status) &&
-      latestSubscription.currentPeriodEnd !== null &&
-      latestSubscription.currentPeriodEnd > now;
-
-    if (hasActiveSubscription) {
-      return true; // Assinante em dia.
-    }
-
-    // 3. Verifica Trial do Sistema (7 dias internos)
-    if (tenant.trialEndsAt && tenant.trialEndsAt > now) {
-      return true; // Trial válido.
-    }
-
-    // --- BLOQUEIO / RESTRIÇÃO ---
-
-    // 4. Modo "Read-Only" (Opcional)
-    // Permite que o usuário inadimplente VEJA os dados, mas não altere.
-    // Isso evita que o sistema pareça "quebrado", ele só fica "trancado".
-    if (request.method === 'GET') {
+    // --- CHECK 1: TRIAL DO SISTEMA (Interno) ---
+    // Se você deu 7 dias de graça via banco de dados (sem pedir cartão no Stripe ainda)
+    if (tenant.isActive && tenant.trialEndsAt && tenant.trialEndsAt > now) {
       return true;
     }
 
-    // 5. Exceção com Payload rico para o Frontend
+    // --- CHECK 2: ASSINATURA STRIPE ---
+    if (latestSub) {
+      // Mapeamento dos Status do Stripe (Geralmente salvamos em UPPERCASE no banco)
+      const status = latestSub.status.toUpperCase(); // active -> ACTIVE
+
+      // A. Status que LIBERAM acesso total
+      // ACTIVE: Pagamento em dia (mesmo que tenha cancelado para o fim do mês)
+      // TRIALING: Período de teste do Stripe
+      if (['ACTIVE', 'TRIALING'].includes(status)) {
+        return true;
+      }
+
+      // B. Status de Atraso (Grace Period)
+      // PAST_DUE: O Stripe está tentando cobrar o cartão novamente.
+      // Permitimos acesso, mas o front deve mostrar um banner "Atualize seu pagamento"
+      if (status === 'PAST_DUE') {
+        // Opcional: Você pode limitar o tempo de past_due se quiser ser rígido
+        return true;
+      }
+
+      // C. Status Cancelado, mas com tempo sobrando
+      // No Stripe, se status virou 'CANCELED', geralmente acabou mesmo.
+      // Mas por segurança, checamos a data.
+      if (status === 'CANCELED' && latestSub.currentPeriodEnd > now) {
+        return true;
+      }
+    }
+
+    // --- BLOQUEIO ---
+
+    // Permite GET (Read-only) se desejar
+    if (request.method === 'GET') {
+      // return true; // Descomente se quiser permitir leitura
+    }
+
     throw new ForbiddenException({
-      message: 'Sua assinatura ou período de teste expirou.',
-      code: 'BILLING_REQUIRED', // Front usa isso para abrir modal de planos
-      planId: tenant.planId, // Front pode sugerir o plano atual
+      message: 'Sua assinatura expirou ou o pagamento falhou.',
+      code: 'BILLING_REQUIRED',
+      details: {
+        stripeStatus: latestSub?.status || 'none',
+      },
       action: 'REDIRECT_TO_BILLING',
-      isProfileComplete: await this.checkBillingProfile(tenant.id).then(
-        (res) => res.isComplete,
-      ),
     });
   }
 }

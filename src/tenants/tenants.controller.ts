@@ -3,12 +3,12 @@ import { Role, type User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TenantsService } from './tenants.service';
 import { UpdateBillingProfileDto } from '../users/dto/update-billing-profile.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { SaveNfeEmailConfigDto } from './dto/create-nfe-email-config.dto';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('tenants')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class TenantsController {
   constructor(private tenantsService: TenantsService) {}
 

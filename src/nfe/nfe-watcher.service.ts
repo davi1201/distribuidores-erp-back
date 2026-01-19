@@ -15,7 +15,7 @@ export class MailWatcherService {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  @Cron(CronExpression.EVERY_3_HOURS)
   async checkEmails() {
     this.logger.log('📥 Verificando e-mails configurados pelos clientes...');
 

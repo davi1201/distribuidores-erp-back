@@ -1,13 +1,22 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Patch,
+} from '@nestjs/common';
 import { SalesService } from './sales.service';
 
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import type { User } from '@prisma/client';
+import type { OrderStatus, User } from '@prisma/client';
 import { CreateOrderDto } from './dto/create-sale.dto';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('sales')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
@@ -18,11 +27,20 @@ export class SalesController {
 
   @Get()
   findAll(@CurrentUser() user: User) {
-    return this.salesService.findAll(user.tenantId || '');
+    return this.salesService.findAll(user.tenantId || '', user);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.salesService.findOne(id, user.tenantId || '');
+  }
+
+  @Patch('status/:id')
+  updateStatus(
+    @Param('id') id: string,
+    @Body('status') newStatus: OrderStatus,
+    @CurrentUser() user: User,
+  ) {
+    return this.salesService.updateStatus(id, user.tenantId || '', newStatus);
   }
 }

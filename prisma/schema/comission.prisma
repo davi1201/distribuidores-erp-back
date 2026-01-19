@@ -1,0 +1,116 @@
+// Enums para controle de estado profissional
+enum CommissionType {
+  PERCENTAGE // Ex: 5% sobre a venda
+  FIXED // Ex: R$ 10,00 por venda
+  HYBRID // Ex: 2% + R$ 5,00
+}
+
+enum CommissionStatus {
+  PENDING // Venda feita, mas ainda não validada (ex: aguardando pgto do cliente)
+  APPROVED // Venda concretizada, comissão pronta para ser paga
+  PAID // Dinheiro transferido para o vendedor
+  CANCELED // Venda cancelada/estornada, comissão anulada
+}
+
+enum CommissionScope {
+  GLOBAL // Regra padrão da empresa
+  SELLER // Regra específica de um vendedor
+  PRODUCT // Regra específica de um produto (ex: queima de estoque)
+}
+
+// ---------------------------------------------------------
+// 1. REGRAS DE COMISSÃO (Configuração)
+// ---------------------------------------------------------
+model CommissionRule {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  name  String // Ex: "Comissão Padrão", "Comissão Senior", "Promoção Black Friday"
+  scope CommissionScope @default(GLOBAL)
+
+  type       CommissionType
+  percentage Decimal?       @db.Decimal(5, 2) // Ex: 5.00 (%)
+  fixedValue Decimal?       @db.Decimal(10, 2) // Ex: 10.00 (R$)
+
+  isActive Boolean @default(true)
+
+  // Relacionamentos opcionais para definir o escopo
+  specificUserId    String? // Se for regra específica de um vendedor
+  specificProductId String? // Se for regra específica de um produto
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("commission_rules")
+}
+
+// ---------------------------------------------------------
+// 2. EXTRATO DE COMISSÕES (O Livro Razão)
+// Aqui fica o registro imutável de cada centavo ganho
+// ---------------------------------------------------------
+model CommissionRecord {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  // Quem ganhou?
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id])
+
+  // Origem da comissão
+  orderId String @unique // Uma comissão por pedido (ou mude para orderItemId se quiser detalhe por item)
+  order   Order  @relation(fields: [orderId], references: [id])
+
+  // Snapshot financeiro (CRUCIAL PARA AUDITORIA)
+  // Salvamos os valores usados NO MOMENTO DA VENDA. 
+  // Se a regra mudar depois, este registro não muda.
+  calculationBase   Decimal @db.Decimal(10, 2) // Sobre qual valor foi calculado? (Total da venda - Frete?)
+  appliedPercentage Decimal @default(0) @db.Decimal(5, 2)
+  commissionAmount  Decimal @db.Decimal(10, 2) // O valor final da comissão
+
+  status CommissionStatus @default(PENDING)
+
+  // Controle de datas
+  referenceDate DateTime // Data da venda
+  dueDate       DateTime? // Data prevista para liberação (ex: D+30)
+  paidAt        DateTime? // Quando o dono efetivamente pagou o vendedor
+
+  // Se houver um pagamento em lote (fechamento de mês), vincula aqui
+  payoutId String?
+  payout   CommissionPayout? @relation(fields: [payoutId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, sellerId, status])
+  @@index([referenceDate])
+  @@map("commission_records")
+}
+
+// ---------------------------------------------------------
+// 3. FECHAMENTOS / LIQUIDAÇÕES (O "Holerite" do Vendedor)
+// Agrupa várias comissões em um único pagamento
+// ---------------------------------------------------------
+model CommissionPayout {
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id])
+
+  totalAmount Decimal @db.Decimal(10, 2)
+  notes       String? // Ex: "Comissões referente a Janeiro/2025"
+
+  // Link para comprovante de transferência bancária, se tiver
+  receiptUrl String?
+
+  paidAt DateTime @default(now())
+
+  // Quais comissões foram pagas neste fechamento?
+  records CommissionRecord[]
+
+  @@map("commission_payouts")
+}

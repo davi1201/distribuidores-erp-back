@@ -6,9 +6,10 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdatePermissionsDto } from './dto/update-permissions.dto';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('users')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(ClerkAuthGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -39,5 +40,11 @@ export class UsersController {
   @Patch('company') // Nova rota para editar a empresa
   updateCompany(@CurrentUser() user: any, @Body() data: any) {
     return this.usersService.updateCompanyProfile(user.userId, data);
+  }
+
+  @Get('sellers')
+  @Roles(Role.OWNER, Role.ADMIN)
+  getAllSellers() {
+    return this.usersService.getAllSellers();
   }
 }

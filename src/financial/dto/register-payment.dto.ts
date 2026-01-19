@@ -1,6 +1,5 @@
 import {
   IsDateString,
-  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -8,31 +7,31 @@ import {
   Min,
 } from 'class-validator';
 
-export enum PaymentType {
-  TOTAL = 'TOTAL', // Paga tudo
-  PARTIAL = 'PARTIAL', // Paga uma parte
-}
-
 export class RegisterPaymentDto {
+  [x: string]: any;
   @IsString()
   @IsNotEmpty()
   titleId: string;
 
   @IsNumber()
   @Min(0.01)
-  amount: number; // Quanto está pagando
+  amount: number; // Valor sendo baixado
+
+  @IsString()
+  @IsNotEmpty()
+  bankAccountId: string; // OBRIGATÓRIO PARA CONCILIAÇÃO
 
   @IsDateString()
   @IsOptional()
-  paymentDate?: string; // Data do pagamento (pode ser retroativo)
+  paymentDate?: string; // Data da baixa
 
   @IsNumber()
   @IsOptional()
-  interest?: number; // Juros/Multa cobrados (adiciona ao valor pago)
+  interest?: number; // Juros (+)
 
   @IsNumber()
   @IsOptional()
-  discount?: number; // Desconto concedido (abate do valor devido)
+  discount?: number; // Desconto (-)
 
   @IsString()
   @IsOptional()

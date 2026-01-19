@@ -11,12 +11,12 @@ import {
 import { TaxProfilesService } from './tax-profiles.service';
 import { CreateTaxProfileDto } from './dto/create-tax-profile.dto';
 import { UpdateTaxProfileDto } from './dto/update-tax-profile.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('tax-profiles')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class TaxProfilesController {
   constructor(private readonly taxProfilesService: TaxProfilesService) {}
 

@@ -4,33 +4,28 @@ enum SubscriptionStatus {
   PAID
   PENDING_PAYMENT
   ENDED
+  PAST_DUE
 }
 
 model Subscription {
   id String @id @default(uuid())
 
-  externalId String  @unique // O ID "sub_..." da Pagar.me
-  customerId String? // O ID "cus_..." da Pagar.me
+  externalId String @unique // ID da assinatura na Stripe (sub_...)
+  customerId String // ID do cliente na Stripe (cus_...)
+  status     String // active, past_due, canceled
 
-  status SubscriptionStatus @default(PENDING_PAYMENT)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
 
-  // Datas de controle
-  currentPeriodStart DateTime?
-  currentPeriodEnd   DateTime? // Importante: Data que vence o acesso
-  canceledAt         DateTime?
-
-  // Relacionamentos
-  tenantId String @unique // Um tenant tem UMA assinatura ativa por vez
+  tenantId String // Removido @unique para permitir histórico (1:N)
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   planId String
   plan   Plan   @relation(fields: [planId], references: [id])
 
-  // Histórico de Faturas (opcional por agora, mas bom ter)
-  invoices Invoice[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Invoice   Invoice[]
 
   @@map("subscriptions")
 }
@@ -47,4 +42,30 @@ model Invoice {
   createdAt DateTime @default(now())
 
   @@map("invoices")
+}
+
+// Adicione ao seu schema.prisma
+
+model PaymentTerm {
+  id          String  @id @default(uuid())
+  tenantId    String
+  name        String // Ex: "Entrada + 30/60", "3x Boleto"
+  description String?
+  type        String // 'PAYABLE', 'RECEIVABLE', 'BOTH'
+  isActive    Boolean @default(true)
+
+  isFlexible Boolean @default(false)
+
+  // Armazena as regras como JSON stringfied
+  // Ex: '[{"days": 0, "percent": 33.33}, {"days": 30, "percent": 33.33}, {"days": 60, "percent": 33.34}]'
+  rules     String
+  Tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  titles    FinancialTitle[]
+  movements FinancialMovement[]
+  orders    Order[]
+
+  @@map("payment_terms")
 }

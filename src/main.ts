@@ -4,7 +4,9 @@ import cookieParser from 'cookie-parser'; // Importação mais segura para TS
 import { RedisIoAdapter } from './adpters/redis.io.adapter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    rawBody: true,
+  });
   app.setGlobalPrefix('api/v1');
   app.use(cookieParser());
 
@@ -20,9 +22,6 @@ async function bootstrap() {
         'http://localhost:3005',
         'https://distribuidores-erp-front.vercel.app',
       ];
-
-      // Verifica se a origem está na lista OU se é um subdomínio de preview da Vercel
-      // Isso libera automaticamente deploys de teste como: https://front-git-develop.vercel.app
       const isAllowed =
         allowedOrigins.includes(origin) || origin.endsWith('.vercel.app');
 

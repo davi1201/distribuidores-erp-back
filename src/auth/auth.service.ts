@@ -8,12 +8,12 @@ import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
-import { PaymentService } from '../payment/payment.service';
 import { addDays } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
+
+// Importações de DTOs devem ser classes reais, não "import type"
 import { LoginDto } from './dto/login.dto';
 import { RegisterSimpleDto } from './dto/register-simple.dto';
-import { RegisterWithSubscriptionDto } from './dto/register-with-subscription.dto';
 import { RegisterDto } from './dto/create-auth.dto';
 
 @Injectable()
@@ -21,9 +21,9 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly paymentService: PaymentService,
   ) {}
 
+  // Helper privado para gerar o token JWT padrão
   private async generateToken(user: any) {
     const payload = {
       sub: user.id,
@@ -47,6 +47,7 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<any> {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (user && user.password && (await bcrypt.compare(pass, user.password))) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { password, ...result } = user;
       return result;
     }
@@ -70,10 +71,18 @@ export class AuthService {
       });
     } else {
       const defaultPlan = await this.prisma.plan.findUnique({
-        where: { slug: 'pro' },
+        where: { slug: 'pro' }, // Ou 'start', conforme sua regra de negócio
       });
-      if (!defaultPlan)
-        throw new NotFoundException('Plano padrão não encontrado.');
+
+      // Fallback seguro caso não tenha plano 'pro' cadastrado
+      const planId =
+        defaultPlan?.id || (await this.prisma.plan.findFirst())?.id;
+
+      if (!planId) {
+        throw new NotFoundException(
+          'Nenhum plano disponível para cadastro automático.',
+        );
+      }
 
       const tempSlug = `tenant-${uuidv4().substring(0, 8)}`;
 
@@ -84,7 +93,7 @@ export class AuthService {
             slug: tempSlug,
             isActive: true,
             trialEndsAt: addDays(new Date(), 7),
-            planId: defaultPlan.id,
+            planId: planId,
           },
         });
 
@@ -95,7 +104,7 @@ export class AuthService {
             role: Role.OWNER,
             tenantId: newTenant.id,
             googleId,
-            password: await bcrypt.hash(uuidv4(), 10),
+            password: await bcrypt.hash(uuidv4(), 10), // Senha aleatória pois usa Google
           },
         });
       });
@@ -144,77 +153,7 @@ export class AuthService {
     return this.generateToken(user);
   }
 
-  async registerWithSubscription(data: RegisterWithSubscriptionDto) {
-    const emailExists = await this.prisma.user.findUnique({
-      where: { email: data.userEmail },
-    });
-    if (emailExists) throw new BadRequestException('E-mail já cadastrado.');
-
-    const tenantExists = await this.prisma.tenant.findUnique({
-      where: { slug: data.companySlug },
-    });
-    if (tenantExists)
-      throw new BadRequestException('URL da empresa já existe.');
-
-    const plan = await this.prisma.plan.findUnique({
-      where: { slug: data.planSlug },
-    });
-    if (!plan) throw new NotFoundException('Plano selecionado inválido.');
-
-    const pagarmeSubscription =
-      await this.paymentService.createPagarmeSubscription(
-        {
-          name: data.companyName,
-          email: data.userEmail,
-          document: data.document,
-        },
-        plan,
-        data.cardToken,
-        data.cycle || 'monthly',
-      );
-
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-
-    const user = await this.prisma.$transaction(async (prisma) => {
-      const tenant = await prisma.tenant.create({
-        data: {
-          name: data.companyName,
-          slug: data.companySlug,
-          isActive: true,
-          planId: plan.id,
-        },
-      });
-
-      const createdUser = await prisma.user.create({
-        data: {
-          name: data.userName,
-          email: data.userEmail,
-          password: hashedPassword,
-          role: Role.OWNER,
-          tenantId: tenant.id,
-        },
-      });
-
-      await prisma.subscription.create({
-        data: {
-          externalId: pagarmeSubscription.id,
-          customerId: pagarmeSubscription.customer.id,
-          status: 'ACTIVE',
-          currentPeriodStart: new Date(
-            pagarmeSubscription.current_cycle.start_at,
-          ),
-          currentPeriodEnd: new Date(pagarmeSubscription.current_cycle.end_at),
-          tenantId: tenant.id,
-          planId: plan.id,
-        },
-      });
-
-      return createdUser;
-    });
-
-    return this.generateToken(user);
-  }
-
+  // Método legado (sem login automático, apenas retorna dados)
   async register(data: RegisterDto) {
     const userExists = await this.prisma.user.findUnique({
       where: { email: data.userEmail },

@@ -21,9 +21,10 @@ model Supplier {
 
   productLinks ProductSupplier[]
 
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  FinancialTitle FinancialTitle[]
 
   @@unique([tenantId, document])
   @@map("suppliers")

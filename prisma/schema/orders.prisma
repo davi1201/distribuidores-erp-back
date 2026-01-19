@@ -15,9 +15,11 @@ model Order {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id])
 
+  paymentTermId String?
+  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
   // Qual a regra de preço usada?
-  priceListId String
-  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  priceListId   String
+  priceList     PriceList    @relation(fields: [priceListId], references: [id])
 
   // Totais (Calculados)
   subtotal Decimal @db.Decimal(10, 2) // Soma dos itens
@@ -37,8 +39,12 @@ model Order {
   tenant          Tenant           @relation(fields: [tenantId], references: [id])
   financialTitles FinancialTitle[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  sellerId String?
+  seller   User?   @relation("SellerOrders", fields: [sellerId], references: [id])
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  CommissionRecord CommissionRecord?
 
   @@map("orders")
 }

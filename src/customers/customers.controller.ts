@@ -21,9 +21,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BillingGuard } from '../auth/guards/billing.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('customers')
-@UseGuards(JwtAuthGuard, RolesGuard, BillingGuard, PermissionsGuard)
+@UseGuards(ClerkAuthGuard, RolesGuard, BillingGuard, PermissionsGuard)
 export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 

@@ -27,6 +27,12 @@ import { SuppliersModule } from './suppliers/suppliers.module';
 import { NfeModule } from './nfe/nfe.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
+import { PaymentTermModule } from './payment-term/payment-term.module';
+import { CommissionsService } from './commissions/commissions.service';
+import { CommissionsController } from './commissions/commissions.controller';
+import { CommissionsModule } from './commissions/commissions.module';
+import { PrismaService } from './prisma/prisma.service';
 
 @Module({
   imports: [
@@ -52,8 +58,11 @@ import { NotificationsModule } from './notifications/notifications.module';
     NfeModule,
     ScheduleModule.forRoot(),
     NotificationsModule,
+    WebhooksModule,
+    PaymentTermModule,
+    CommissionsModule,
   ],
-  controllers: [],
+  controllers: [CommissionsController],
   providers: [
     AuditService,
     {

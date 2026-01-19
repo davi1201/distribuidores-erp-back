@@ -44,7 +44,7 @@ export class StockService {
 
   // --- 2. LISTAR DEPÓSITOS (Necessário para o Select do Front) ---
   async getWarehouses(user: any) {
-    const { tenantId, id: userId } = user;
+    const { tenantId, userId } = user;
     // Garante que a matriz existe antes de listar
     await this.getOrCreateDefaultWarehouse(tenantId);
 
@@ -344,18 +344,14 @@ export class StockService {
       where: whereCondition,
       include: {
         stock: {
-          // Se um warehouseId foi especificado, trazemos APENAS o stock item daquele warehouse
           where: warehouseId ? { warehouseId } : undefined,
         },
         images: { take: 1 },
-        // Removemos o include de 'variants', pois garantimos pelo filtro que eles não têm filhos
       },
       orderBy: { name: 'asc' },
     });
 
-    // Mapeamento simplificado
     return products.map((p) => {
-      // Como removemos os pais, a lógica de soma é direta sobre o array 'stock' do próprio item
       const totalQty = p.stock.reduce((acc, s) => acc + Number(s.quantity), 0);
 
       return {
@@ -375,6 +371,8 @@ export class StockService {
     userId: string,
     tenantId: string,
   ) {
+    console.log('user', userId);
+
     const transfer = await this.prisma.stockTransfer.create({
       data: {
         tenantId,

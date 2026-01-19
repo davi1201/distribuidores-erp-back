@@ -142,7 +142,7 @@ export class ProductsService {
         throw new NotFoundException('Produto não encontrado.');
       }
 
-      // Atualiza PAI
+      // Atualiza PAI (Dados gerais)
       if (parentData && existingParent.variants.length > 0) {
         await tx.product.update({
           where: { id: parentId },
@@ -160,13 +160,21 @@ export class ProductsService {
       }
 
       const updatedProducts: any[] = [];
+
+      // --- CORREÇÃO AQUI ---
       const existingVariantIds = new Set(
         existingParent.variants.map((v) => v.id),
       );
+      // Adiciona o próprio Pai na lista de IDs válidos para Update
+      existingVariantIds.add(parentId);
+      // ---------------------
 
       for (const variant of variants) {
         const variantId = (variant as any).id;
+
+        // Agora isso vai retornar TRUE para o ID do pai
         const isUpdate = variantId && existingVariantIds.has(variantId);
+
         const finalName = parentData
           ? `${parentData.name} ${variant.name}`
           : variant.name;
@@ -186,7 +194,7 @@ export class ProductsService {
         };
 
         if (isUpdate) {
-          // UPDATE
+          // UPDATE (Vai cair aqui agora)
           const product = await this.updateSingleProductInternal(
             tx,
             variantId,
@@ -286,6 +294,7 @@ export class ProductsService {
 
     // 2. Manipuladores de sub-recursos
     await this.handleImages(tx, product.id, data.images);
+
     await this.handleStock(
       tx,
       product.id,
@@ -296,13 +305,16 @@ export class ProductsService {
       product.costPrice,
       true,
     );
+
     await this.handlePrices(
       tx,
       product.id,
       data.prices,
       user.userId,
       'Cadastro Inicial',
+      tenantId,
     );
+
     await this.handleSupplier(
       tx,
       product.id,
@@ -375,6 +387,7 @@ export class ProductsService {
         data.prices,
         user.userId,
         data.changeReason || 'Alteração manual',
+        tenantId,
       );
 
     if (data.supplier !== undefined)
@@ -488,6 +501,7 @@ export class ProductsService {
     prices: any[],
     userId: string,
     reason: string,
+    tenantId: string,
   ) {
     if (!prices || prices.length === 0) return;
 
@@ -510,7 +524,12 @@ export class ProductsService {
             productId_priceListId: { productId, priceListId: p.priceListId },
           },
           update: { price: newPriceVal },
-          create: { productId, priceListId: p.priceListId, price: newPriceVal },
+          create: {
+            productId,
+            priceListId: p.priceListId,
+            price: newPriceVal,
+            tenantId,
+          },
         });
 
         await tx.productPriceHistory.create({
@@ -571,7 +590,12 @@ export class ProductsService {
       : `PRD-${generateSku()}`;
 
     const skuExists = await tx.product.findUnique({
-      where: { sku },
+      where: {
+        tenantId_sku: {
+          tenantId: tenantId, // Você precisa ter o tenantId disponível nessa função
+          sku: sku.toUpperCase(), // ou a variável que contém o SKU
+        },
+      },
     });
 
     if (skuExists && skuExists.tenantId === tenantId) {

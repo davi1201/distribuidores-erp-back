@@ -1,349 +1,406 @@
 import {
   Injectable,
   BadRequestException,
-  InternalServerErrorException,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import axios from 'axios';
-import { AuditService } from '../audit/audit.service';
-import { UpgradeSubscriptionDto } from './dto/upgrade-subscription';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { clerkClient } from '@clerk/clerk-sdk-node';
+import Stripe from 'stripe';
 
 @Injectable()
 export class PaymentService {
-  private logger = new Logger(PaymentService.name);
-  private api = axios.create({
-    baseURL: process.env.PAGARME_API_URL,
-    auth: {
-      username: process.env.PAGARME_API_KEY || '',
-      password: '',
-    },
-  });
+  private stripe: Stripe;
+  private readonly logger = new Logger(PaymentService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly auditService: AuditService,
-  ) {}
-
-  getPaymentConfig() {
-    return {
-      publicKey: process.env.PAGARME_PUBLIC_KEY || '',
-    };
+  constructor(private readonly prisma: PrismaService) {
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+      apiVersion: '2025-11-17.clover' as any, // Ajustado para a versão exigida pelo seu SDK
+    });
   }
 
-  async createPagarmeSubscription(
-    customerData: any,
-    plan: any,
-    cardToken: string,
-    cycle: 'monthly' | 'yearly' = 'monthly',
-  ) {
-    let amount = Number(plan.price);
-    let interval = 'month';
-    let intervalCount = 1;
+  private getFrontendUrl() {
+    let url = process.env.FRONTEND_URL || 'http://localhost:3005';
+    // Remove barra no final se houver
+    url = url.replace(/\/$/, '');
 
-    if (cycle === 'yearly') {
-      if (!plan.yearlyPrice) {
-        throw new BadRequestException('Este plano não aceita pagamento anual.');
-      }
-      amount = Number(plan.yearlyPrice);
-      interval = 'year';
-      intervalCount = 1;
+    // Adiciona protocolo se não houver
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      url = `http://${url}`;
     }
-
-    const rawPhone = customerData.phone
-      ? customerData.phone.replace(/\D/g, '')
-      : '11999999999';
-    const areaCode = rawPhone.substring(0, 2);
-    const phoneNumber = rawPhone.substring(2);
-
-    const payload: any = {
-      payment_method: 'credit_card',
-      currency: 'BRL',
-      interval: interval,
-      interval_count: intervalCount,
-      billing_type: 'prepaid',
-      card_token: cardToken,
-      customer: {
-        name: customerData.name,
-        email: customerData.email,
-        document: customerData.document.replace(/\D/g, ''),
-        type:
-          customerData.document.replace(/\D/g, '').length > 11
-            ? 'company'
-            : 'individual',
-        phones: {
-          mobile_phone: {
-            country_code: '55',
-            area_code: areaCode,
-            number: phoneNumber,
-          },
-        },
-      },
-      items: [
-        {
-          pricing_scheme: {
-            price: Math.round(amount * 100),
-          },
-          quantity: 1,
-          description: `Plano ${plan.name} (${cycle === 'yearly' ? 'Anual' : 'Mensal'})`,
-        },
-      ],
-    };
-
-    if (customerData.address) {
-      payload.customer.address = {
-        line_1: `${customerData.address.number}, ${customerData.address.street}, ${customerData.address.neighborhood}`,
-        line_2: customerData.address.complement || '',
-        zip_code: customerData.address.zipCode.replace(/\D/g, ''),
-        city: customerData.address.city,
-        state: customerData.address.state,
-        country: 'BR',
-      };
-    }
-
-    try {
-      const { data } = await this.api.post('/subscriptions', payload);
-      return data;
-    } catch (error) {
-      this.logger.error(
-        'Erro Pagar.me create:',
-        JSON.stringify(error.response?.data || error.message),
-      );
-      throw new BadRequestException(
-        'Falha ao processar pagamento. Verifique os dados do cartão.',
-      );
-    }
+    return url;
   }
 
-  async cancelPagarmeSubscription(externalId: string) {
-    try {
-      await this.api.delete(`/subscriptions/${externalId}`);
-      return true;
-    } catch (error) {
-      this.logger.error(
-        `Erro ao cancelar sub ${externalId}`,
-        JSON.stringify(error.response?.data),
-      );
-      return false;
-    }
-  }
-
-  async createSubscription(
+  // --- 1. CRIAR SESSÃO DE CHECKOUT ---
+  async createCheckoutSession(
     tenantId: string,
     planSlug: string,
-    cardToken: string,
-    user: any,
-    cycle: 'monthly' | 'yearly' = 'monthly',
+    userEmail: string,
+    cycle: 'monthly' | 'yearly',
   ) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: { billingProfile: true },
-    });
-
     const plan = await this.prisma.plan.findUnique({
       where: { slug: planSlug },
     });
+    if (!plan) throw new NotFoundException('Plano não encontrado.');
 
-    if (!tenant || !plan)
-      throw new BadRequestException('Dados inválidos (Tenant ou Plano).');
+    const priceId =
+      cycle === 'yearly' ? plan.stripeYearlyPriceId : plan.stripeMonthlyPriceId;
 
-    const billing = tenant.billingProfile;
-    if (!billing || !billing.document) {
+    if (!priceId) {
       throw new BadRequestException(
-        'Perfil de faturamento incompleto. Atualize seus dados antes de assinar.',
+        'ID do preço na Stripe não configurado para este plano/ciclo.',
       );
     }
 
-    try {
-      const pagarmeSub = await this.createPagarmeSubscription(
-        {
-          name: tenant.name,
-          email: billing.email || user.email,
-          document: billing.document,
-          phone: billing.phone,
-          address: {
-            street: billing.street,
-            number: billing.number,
-            zipCode: billing.zipCode,
-            neighborhood: billing.neighborhood,
-            city: billing.cityName,
-            state: billing.stateUf,
-            complement: billing.complement,
-          },
-        },
-        plan,
-        cardToken,
-        cycle,
-      );
+    const baseUrl = this.getFrontendUrl();
 
-      const subscription = await this.prisma.subscription.create({
-        data: {
-          externalId: pagarmeSub.id,
-          customerId: pagarmeSub.customer.id,
-          status: 'ACTIVE',
-          currentPeriodStart: new Date(pagarmeSub.current_cycle.start_at),
-          currentPeriodEnd: new Date(pagarmeSub.current_cycle.end_at),
-          tenantId: tenant.id,
-          planId: plan.id,
-        },
-      });
+    const session = await this.stripe.checkout.sessions.create({
+      payment_method_types: ['card', 'boleto'],
+      ui_mode: 'embedded',
+      mode: 'subscription',
+      customer_email: userEmail,
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata: {
+        tenantId,
+        planSlug,
+      },
+      // success_url: `${baseUrl}/dashboard?success=true`,
+      // cancel_url: `${baseUrl}/billing?canceled=true`,
+      return_url: `${baseUrl}/checkout/return?session_id={CHECKOUT_SESSION_ID}`,
+      allow_promotion_codes: true,
+    });
 
-      await this.prisma.tenant.update({
-        where: { id: tenantId },
-        data: {
-          isActive: true,
-          planId: plan.id,
-          trialEndsAt: null,
-        },
-      });
-
-      await this.auditService.log({
-        action: 'SUBSCRIBE',
-        entity: 'Subscription',
-        entityId: subscription.id,
-        userId: user.id || user.userId,
-        details: {
-          plan: plan.name,
-          amount: cycle === 'yearly' ? plan.yearlyPrice : plan.price,
-        },
-      });
-
-      return subscription;
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      this.logger.error('Erro ao salvar assinatura no banco', error);
-      throw new InternalServerErrorException('Erro ao processar assinatura.');
-    }
+    return {
+      clientSecret: session.client_secret,
+    };
   }
 
-  async upgradeSubscription(
-    tenantId: string,
-    dto: UpgradeSubscriptionDto,
-    user: any,
-  ) {
-    this.logger.log(
-      `Iniciando upgrade para Tenant ${tenantId} -> Plano ${dto.planSlug}`,
-    );
-
-    const currentSubscription = await this.prisma.subscription.findFirst({
+  // --- 2. PORTAL DO CLIENTE ---
+  async createPortalSession(tenantId: string) {
+    const sub = await this.prisma.subscription.findFirst({
       where: {
         tenantId,
-        status: { in: ['ACTIVE'] },
+        // Garante que pega uma assinatura válida ou recente
+        status: { in: ['active', 'trialing', 'past_due', 'incomplete'] },
       },
       orderBy: { createdAt: 'desc' },
+      select: { customerId: true },
     });
 
-    if (currentSubscription) {
-      this.logger.log(
-        `Cancelando assinatura antiga: ${currentSubscription.externalId}`,
+    if (!sub?.customerId) {
+      throw new BadRequestException(
+        'Nenhuma assinatura encontrada para gerenciar.',
       );
-
-      await this.cancelPagarmeSubscription(currentSubscription.externalId);
-
-      await this.prisma.subscription.update({
-        where: { id: currentSubscription.id },
-        data: {
-          status: 'CANCELED',
-          canceledAt: new Date(),
-        },
-      });
     }
 
-    return this.createSubscription(
-      tenantId,
-      dto.planSlug,
-      dto.cardToken,
-      user,
-      dto.cycle || 'monthly',
-    );
+    const baseUrl = this.getFrontendUrl();
+
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: sub.customerId,
+      return_url: `${baseUrl}/billing`,
+    });
+
+    return { url: session.url };
   }
 
-  async handleWebhook(headers: any, body: any) {
-    const signature = headers['x-hub-signature'];
-    if (!this.isValidSignature(signature, JSON.stringify(body))) {
-      throw new BadRequestException('Assinatura de webhook inválida.');
+  // --- 3. WEBHOOKS ---
+  async handleStripeWebhook(signature: string, rawBody: Buffer) {
+    let event: Stripe.Event;
+
+    try {
+      event = this.stripe.webhooks.constructEvent(
+        rawBody,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET || '',
+      );
+    } catch (err) {
+      this.logger.error(`Webhook Signature Error: ${err.message}`);
+      throw new BadRequestException('Webhook Inválido');
     }
 
-    const eventType = body.type;
-    const data = body.data;
+    // Casting explicito para evitar erros de tipo genéricos
+    const object = event.data.object;
 
-    await this.auditService.log({
-      action: 'WEBHOOK_RECEIVED',
-      entity: 'Payment',
-      userId: 'system',
-      details: { type: eventType, subscriptionId: data.subscription?.id },
-    });
-
-    switch (eventType) {
-      case 'invoice.paid':
-        await this.handleInvoicePaid(data);
+    switch (event.type) {
+      case 'checkout.session.completed':
+        await this.handleCheckoutCompleted(object as Stripe.Checkout.Session);
         break;
+
+      case 'invoice.payment_succeeded':
+        await this.handleInvoiceSucceeded(object as Stripe.Invoice);
+        break;
+
       case 'invoice.payment_failed':
-        await this.handlePaymentFailed(data);
+        await this.handlePaymentFailed(object as Stripe.Invoice);
         break;
-      case 'subscription.canceled':
-        await this.handleSubscriptionCanceled(data);
+
+      case 'customer.subscription.deleted':
+        await this.handleSubscriptionDeleted(object as Stripe.Subscription);
         break;
-      default:
-        console.log(`Evento ${eventType} ignorado.`);
+
+      case 'product.created':
+      case 'product.updated':
+        await this.handleProductSync(object as Stripe.Product);
+        break;
+
+      case 'price.created':
+      case 'price.updated':
+        await this.handlePriceSync(object as Stripe.Price);
+        break;
     }
 
     return { received: true };
   }
 
-  private isValidSignature(signature: string, payload: string): boolean {
-    return true;
-  }
+  // --- HANDLERS INTERNOS ---
 
-  private async handleInvoicePaid(data: any) {
-    const subExists = await this.prisma.subscription.findUnique({
-      where: { externalId: data.subscription.id },
+  private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+    const tenantId = session.metadata?.tenantId;
+    const planSlug = session.metadata?.planSlug;
+
+    if (!tenantId || !planSlug) return;
+
+    const plan = await this.prisma.plan.findUnique({
+      where: { slug: planSlug },
     });
+    if (!plan) return;
 
-    if (!subExists) return;
+    const subscriptionId = session.subscription as string;
 
-    await this.prisma.subscription.update({
-      where: { externalId: data.subscription.id },
-      data: {
-        status: 'ACTIVE',
-        currentPeriodStart: new Date(data.period.start_at),
-        currentPeriodEnd: new Date(data.period.end_at),
+    await this.prisma.subscription.upsert({
+      where: { externalId: subscriptionId },
+      create: {
+        tenantId,
+        planId: plan.id,
+        externalId: subscriptionId,
+        customerId: session.customer as string,
+        status: 'active',
+        currentPeriodStart: new Date(),
+        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+      },
+      update: {
+        customerId: session.customer as string,
+        planId: plan.id,
+        status: 'active',
       },
     });
 
-    await this.prisma.tenant.update({
-      where: { id: subExists.tenantId },
-      data: { isActive: true, trialEndsAt: null },
-    });
+    await this.syncTenantStatus(tenantId, 'active', plan, plan.maxUsers);
   }
 
-  private async handlePaymentFailed(data: any) {
-    const subExists = await this.prisma.subscription.findUnique({
-      where: { externalId: data.subscription.id },
+  private async handleInvoiceSucceeded(invoice: Stripe.Invoice) {
+    const subscriptionId = (invoice as any).subscription as string | undefined;
+    if (!subscriptionId) return;
+
+    const retrieved = await this.stripe.subscriptions.retrieve(subscriptionId);
+    const subStripe = retrieved as any;
+
+    const existingSub = await this.prisma.subscription.findUnique({
+      where: { externalId: subscriptionId },
+      include: { plan: true },
     });
-    if (!subExists) return;
+
+    if (!existingSub) return;
 
     await this.prisma.subscription.update({
-      where: { externalId: data.subscription.id },
-      data: { status: 'PENDING_PAYMENT' },
+      where: { id: existingSub.id },
+      data: {
+        status: subStripe.status,
+        currentPeriodStart: new Date(subStripe.current_period_start * 1000),
+        currentPeriodEnd: new Date(subStripe.current_period_end * 1000),
+      },
+    });
+
+    await this.syncTenantStatus(
+      existingSub.tenantId,
+      'active',
+      existingSub.plan,
+      existingSub.plan.maxUsers,
+    );
+  }
+
+  private async handlePaymentFailed(invoice: Stripe.Invoice) {
+    const inv = invoice as any;
+    if (!inv.subscription) return;
+
+    const subId =
+      typeof inv.subscription === 'string'
+        ? inv.subscription
+        : (inv.subscription as Stripe.Subscription).id;
+
+    await this.prisma.subscription.updateMany({
+      where: { externalId: subId },
+      data: { status: 'past_due' },
     });
   }
 
-  private async handleSubscriptionCanceled(data: any) {
-    const externalId = data.subscription?.id || data.id;
-    const subExists = await this.prisma.subscription.findUnique({
-      where: { externalId: externalId },
-    });
-    if (!subExists) return;
-
-    const sub = await this.prisma.subscription.update({
-      where: { externalId: externalId },
-      data: { status: 'CANCELED', canceledAt: new Date() },
+  private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+    const dbSub = await this.prisma.subscription.findUnique({
+      where: { externalId: subscription.id },
+      include: { plan: true },
     });
 
-    await this.prisma.tenant.update({
-      where: { id: sub.tenantId },
-      data: { isActive: false },
+    if (dbSub) {
+      await this.prisma.subscription.update({
+        where: { id: dbSub.id },
+        data: { status: 'canceled' },
+      });
+
+      await this.syncTenantStatus(
+        dbSub.tenantId,
+        'inactive',
+        dbSub.plan,
+        dbSub.plan.maxUsers,
+      );
+    }
+  }
+
+  // Helper para atualizar Banco Local + Clerk
+  private async syncTenantStatus(
+    tenantId: string,
+    status: string,
+    plan: any,
+    maxUsers: number,
+  ) {
+    const isActive = status === 'active' || status === 'trialing';
+
+    const tenant = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        isActive: isActive,
+        trialEndsAt: null,
+      },
     });
+
+    if (tenant.clerkId) {
+      try {
+        await clerkClient.organizations.updateOrganizationMetadata(
+          tenant.clerkId,
+          {
+            publicMetadata: {
+              plan: plan.slug,
+              status: status,
+              maxUsers: maxUsers,
+            },
+          },
+        );
+        this.logger.log(
+          `Tenant ${tenantId} sincronizado com Clerk. Status: ${status}`,
+        );
+      } catch (e) {
+        this.logger.error(`Erro ao atualizar Clerk: ${e.message}`);
+      }
+    }
+  }
+
+  private async handleProductSync(product: Stripe.Product) {
+    const slug = product.metadata.slug || this.generateSlug(product.name);
+    const maxUsers = product.metadata.maxUsers
+      ? parseInt(product.metadata.maxUsers)
+      : 1;
+
+    // Mapeia os dados básicos
+    const data = {
+      name: product.name,
+      description: product.description,
+      active: product.active,
+      stripeProductId: product.id, // Certifique-se de ter este campo no Prisma
+      slug: slug,
+      maxUsers: maxUsers,
+      price: 0, // Default price, will be updated by handlePriceSync
+      // Se tiver imagem, pega a primeira
+      // imageUrl: product.images?.[0] || null,
+    };
+
+    await this.prisma.plan.upsert({
+      where: { stripeProductId: product.id }, // Busca pelo ID do Stripe (mais seguro que slug)
+      create: {
+        stripeProductId: product.id,
+        name: product.name,
+        slug: slug,
+        isActive: product.active, // <--- ATENÇÃO: Use 'isActive' (seu schema), não 'active'
+        maxUsers: maxUsers,
+        price: data.price,
+      },
+      update: {
+        name: data.name,
+        isActive: data.active,
+        maxUsers: data.maxUsers,
+      },
+    });
+
+    this.logger.log(`Plano sincronizado: ${product.name}`);
+  }
+
+  private async handlePriceSync(price: Stripe.Price) {
+    if (typeof price.product !== 'string') return; // Se vier expandido, ignoramos por segurança ou tratamos
+
+    const product = await this.prisma.plan.findUnique({
+      where: { stripeProductId: price.product },
+    });
+
+    if (!product) {
+      this.logger.warn(
+        `Preço criado para produto desconhecido: ${price.product}`,
+      );
+      return;
+    }
+
+    // Identifica se é mensal ou anual
+    const updateData: any = {};
+
+    if (price.type === 'recurring') {
+      if (price.recurring?.interval === 'month') {
+        updateData.stripeMonthlyPriceId = price.id;
+        updateData.priceMonthly = price.unit_amount
+          ? price.unit_amount / 100
+          : 0; // Se salvar valor no banco
+      } else if (price.recurring?.interval === 'year') {
+        updateData.stripeYearlyPriceId = price.id;
+        updateData.priceYearly = price.unit_amount
+          ? price.unit_amount / 100
+          : 0;
+      }
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await this.prisma.plan.update({
+        where: { id: product.id },
+        data: updateData,
+      });
+      this.logger.log(`Preço atualizado para o plano ${product.name}`);
+    }
+  }
+
+  private generateSlug(text: string): string {
+    return text
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '-') // Substitui espaços por -
+      .replace(/[^\w\-]+/g, '') // Remove caracteres não alfanuméricos
+      .replace(/\-\-+/g, '-'); // Remove múltiplos hifens
+  }
+
+  async getCurrentSubscription(tenantId: string) {
+    const sub = await this.prisma.subscription.findFirst({
+      where: {
+        tenantId,
+        status: { in: ['active', 'trialing', 'past_due'] },
+      },
+      include: { plan: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!sub) return null;
+
+    return {
+      planName: sub.plan.name,
+      status: sub.status,
+      amount: sub.plan.price, // ou use price/yearlyPrice dependendo da lógica
+      cycle: 'mensal', // Você pode inferir isso comparando currentPeriodStart/End
+      nextBillingDate: sub.currentPeriodEnd,
+      cancelAtPeriodEnd: false, // Se tiver esse campo no banco, retorne
+    };
   }
 }

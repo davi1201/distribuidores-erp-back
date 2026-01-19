@@ -75,7 +75,7 @@ export class UsersService {
 
       planSlug: tenant?.plan?.slug,
       planName: tenant?.plan?.name,
-      planMaxUsers: tenant?.plan?.maxUsers,
+      planMaxUsers: 3,
 
       status,
       isTrial: status === 'TRIAL',
@@ -237,6 +237,14 @@ export class UsersService {
         permissions: newPermissions,
       },
       select: { id: true, name: true, permissions: true },
+    });
+  }
+
+  async getAllSellers() {
+    return this.prisma.user.findMany({
+      where: { role: Role.SELLER },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
     });
   }
 }

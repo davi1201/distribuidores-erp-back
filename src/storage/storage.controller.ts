@@ -10,10 +10,10 @@ import {
 // CORREÇÃO AQUI: O pacote correto é @nestjs/platform-express
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { StorageService } from './storage.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('upload')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class StorageController {
   constructor(private readonly storageService: StorageService) {}
 

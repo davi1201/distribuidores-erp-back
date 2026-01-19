@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProductsService } from '../products/products.service';
 import { StockService } from '../stock/stock.service';
 import { MailWatcherService } from './nfe-watcher.service';
+import { FinancialService } from 'src/financial/financial.service';
 
 @Module({
   controllers: [NfeController],
@@ -14,6 +15,7 @@ import { MailWatcherService } from './nfe-watcher.service';
     ProductsService,
     StockService,
     MailWatcherService,
+    FinancialService,
   ],
 })
 export class NfeModule {}

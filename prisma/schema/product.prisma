@@ -6,10 +6,13 @@ model Product {
   // Identificação
   name        String
   description String? @db.Text
-  sku         String  @unique
-  ean         String?
-  brand       String?
-  unit        String  @default("UN")
+
+  // CORREÇÃO AQUI: Removemos o @unique desta linha
+  sku String
+
+  ean   String?
+  brand String?
+  unit  String  @default("UN")
 
   // Variações
   parentId    String?
@@ -37,7 +40,6 @@ model Product {
   images       ProductImage[]
   movements    StockMovement[]
 
-  // CORREÇÃO: Relacionamento 1:1 com Fornecedor (Opcional pois pode nascer sem)
   supplier ProductSupplier?
 
   isActive          Boolean             @default(true)
@@ -46,7 +48,8 @@ model Product {
   OrderItem         OrderItem[]
   StockTransferItem StockTransferItem[]
 
-  @@index([tenantId, sku])
+  @@unique([tenantId, sku])
+  // Índices para performance
   @@index([tenantId, name])
   @@map("products")
 }
@@ -63,9 +66,13 @@ model ProductImage {
 }
 
 model ProductPrice {
-  id          String    @id @default(uuid())
-  price       Decimal   @db.Decimal(10, 4)
-  productId   String
+  id        String  @id @default(uuid())
+  price     Decimal @db.Decimal(10, 4)
+  productId String
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
   product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   priceListId String
   priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)

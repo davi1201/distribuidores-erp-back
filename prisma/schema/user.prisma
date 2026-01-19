@@ -6,6 +6,8 @@ model User {
   role     Role    @default(ADMIN)
   phone    String? // Adicionado: Contato do usuário
 
+  clerkId String? @unique
+
   // Google Auth
   googleId  String? @unique
   avatarUrl String?
@@ -31,15 +33,18 @@ model User {
   Warehouse           Warehouse[]
   SellerProfile       SellerProfile?
   StockTransfer       StockTransfer[]
-
+  createdTitles       FinancialTitle[]      @relation("UserCreatedTitles")
+  sales               Order[]               @relation("SellerOrders")
   // Transferências que ele pediu
-  transfersRequested StockTransfer[] @relation("RequesterUser")
+  transfersRequested  StockTransfer[]       @relation("RequesterUser")
 
   // Transferências que ele aprovou (Admin/Matriz)
   transfersApproved StockTransfer[] @relation("ApproverUser")
 
   // Transferências que ele conferiu/recebeu (Seller)
-  transfersReceived StockTransfer[] @relation("ReceiverUser")
+  transfersReceived StockTransfer[]    @relation("ReceiverUser")
+  CommissionRecord  CommissionRecord[]
+  CommissionPayout  CommissionPayout[]
 
   @@map("users")
 }

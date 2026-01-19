@@ -10,15 +10,14 @@ import {
 } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { CreateStockMovementDto } from './dto/create-movement.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
-import { TransferStockDto } from './dto/transfer-stock.dto';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('stock')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 
@@ -42,7 +41,7 @@ export class StockController {
 
   @Get('transfers')
   findAllTransfers(@CurrentUser() user: User) {
-    // Se for SELLER, filtrar onde requesterId == user.id OU destination.responsibleUserId == user.id
+    
     return this.stockService.findAllTransfers(user, user.tenantId || '');
   }
 

@@ -13,9 +13,10 @@ import { CreatePriceListDto } from './dto/create-price-list.dto';
 import { UpdatePriceListDto } from './dto/update-price-list.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('price-lists')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ClerkAuthGuard)
 export class PriceListsController {
   constructor(private readonly priceListsService: PriceListsService) {}
 

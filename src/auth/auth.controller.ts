@@ -69,18 +69,18 @@ export class AuthController {
     return { message: 'Logout realizado' };
   }
 
-  @Post('register-full')
-  async registerFull(
-    @Body() dto: RegisterWithSubscriptionDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.registerWithSubscription(dto);
+  // @Post('register-full')
+  // async registerFull(
+  //   @Body() dto: RegisterWithSubscriptionDto,
+  //   @Res({ passthrough: true }) res: Response,
+  // ) {
+  //   const result = await this.authService.registerWithSubscription(dto);
 
-    // Reutiliza a lógica
-    this.setAuthCookie(res, result.access_token);
+  //   // Reutiliza a lógica
+  //   this.setAuthCookie(res, result.access_token);
 
-    return result;
-  }
+  //   return result;
+  // }
 
   @Post('register-simple')
   async registerSimple(

@@ -1,43 +1,46 @@
-import { Type } from 'class-transformer';
 import {
   IsArray,
-  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export class CreateOrderItemDto {
+export class OrderItemDto {
   @IsString()
   @IsNotEmpty()
   productId: string;
 
+  @IsOptional()
+  @IsUUID()
+  @IsString()
+  sellerId?: string;
+
   @IsNumber()
-  @Min(0.0001)
+  @Min(1)
   quantity: number;
 
   @IsNumber()
-  @Min(0)
   @IsOptional()
   discount?: number;
 }
 
-export class CreateOrderInstallmentDto {
+export class InstallmentPlanDto {
   @IsNumber()
-  @IsNotEmpty()
-  number: number;
+  days: number;
 
   @IsNumber()
-  @IsNotEmpty()
-  amount: number;
+  @IsOptional()
+  percent?: number;
 
-  @IsDateString()
-  @IsNotEmpty()
-  dueDate: string;
+  @IsNumber()
+  @IsOptional()
+  fixedAmount?: number;
 }
 
 export class CreateOrderDto {
@@ -50,27 +53,28 @@ export class CreateOrderDto {
   priceListId: string;
 
   @IsNumber()
-  @Min(0)
   @IsOptional()
   shipping?: number;
 
   @IsNumber()
-  @Min(0)
   @IsOptional()
   discount?: number;
 
   @IsString()
+  paymentMethodId: string;
+
+  @IsString()
   @IsOptional()
-  paymentMethod?: string;
+  paymentTermId?: string; // NOVO: ID da condição de pagamento
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateOrderInstallmentDto)
+  @Type(() => InstallmentPlanDto)
   @IsOptional()
-  installments?: CreateOrderInstallmentDto[];
+  installmentsPlan?: InstallmentPlanDto[]; // NOVO: Plano manual se flexível
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => CreateOrderItemDto)
-  items: CreateOrderItemDto[];
+  @Type(() => OrderItemDto)
+  items: OrderItemDto[];
 }

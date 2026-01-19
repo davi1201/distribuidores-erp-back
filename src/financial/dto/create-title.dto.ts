@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export enum PaymentMethodEnum {
@@ -14,25 +15,49 @@ export enum PaymentMethodEnum {
   PIX = 'PIX',
   CASH = 'CASH',
   BOLETO = 'BOLETO',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+}
+
+export enum FinancialTitleType {
+  RECEIVABLE = 'RECEIVABLE',
+  PAYABLE = 'PAYABLE',
 }
 
 export class CreateTitleDto {
-  @IsString()
+  @IsEnum(FinancialTitleType)
   @IsNotEmpty()
-  titleNumber: string;
+  type: FinancialTitleType; // Define se é Pagar ou Receber
 
   @IsString()
   @IsOptional()
-  description?: string;
+  titleNumber?: string; // Opcional, o sistema gera se não vier
 
   @IsString()
   @IsNotEmpty()
-  customerId: string;
+  description: string;
+
+  // --- VINCULOS (Condicionais na lógica de negócio) ---
+  @IsString()
+  @IsOptional()
+  customerId?: string; // Obrigatório se RECEIVABLE (validado no service)
 
   @IsString()
   @IsOptional()
-  orderId?: string;
+  supplierId?: string; // Obrigatório se PAYABLE (validado no service)
 
+  @IsString()
+  @IsOptional()
+  orderId?: string; // Venda
+
+  @IsString()
+  @IsOptional()
+  importId?: string; // Importação
+
+  @IsString()
+  @IsOptional()
+  categoryId?: string; // Plano de Contas
+
+  // --- VALORES E DATAS ---
   @IsNumber()
   @Min(0.01)
   amount: number;
@@ -40,7 +65,6 @@ export class CreateTitleDto {
   @IsDateString()
   dueDate: string; // ISO Date
 
-  @IsEnum(PaymentMethodEnum)
-  @IsOptional()
-  paymentMethod?: string;
+  @IsString()
+  paymentMethodId: string;
 }

@@ -1,20 +1,30 @@
 model Plan {
-  id   String @id @default(uuid())
-  name String
-  slug String @unique
+  id              String  @id @default(uuid())
+  stripeProductId String? @unique
+  name            String
+  slug            String  @unique
 
-  // Preços
-  price       Decimal  @db.Decimal(10, 2) // Preço Mensal (Padrão)
-  yearlyPrice Decimal? @db.Decimal(10, 2) // Preço Anual (Opcional)
+  // Preços Visuais (Para exibir no frontend)
+  price       Decimal  @db.Decimal(10, 2) // Mensal
+  yearlyPrice Decimal? @db.Decimal(10, 2) // Anual
 
-  isActive      Boolean        @default(true)
-  features      Json?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  // IDs da Stripe (Para processar o pagamento)
+  stripeMonthlyPriceId String?
+  stripeYearlyPriceId  String?
+
+  isActive Boolean @default(true)
+  features Json? // Outras features (ex: "tem_api": true)
+
+  // Limite de usuários explícito (1 = Só o dono)
+  maxUsers Int @default(1)
+
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   tenants       Tenant[]
   subscriptions Subscription[]
-
-  maxUsers Int @default(1) // Limite de usuários (1 = Só o dono)
 
   @@map("plans")
 }

@@ -1,18 +1,23 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-sale.dto';
 import { FinancialService } from '../financial/financial.service';
-import { OrderStatus } from '@prisma/client';
+import { OrderStatus, Prisma } from '@prisma/client';
+import { CommissionsService } from 'src/commissions/commissions.service';
 
 @Injectable()
 export class SalesService {
+  private readonly logger = new Logger(SalesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly financialService: FinancialService,
+    private readonly commissionsService: CommissionsService, // <--- INJETADO
   ) {}
 
   async create(createDto: CreateOrderDto, tenantId: string, user: any) {
@@ -22,28 +27,32 @@ export class SalesService {
       items,
       shipping = 0,
       discount = 0,
-      paymentMethod,
-      installments,
+      paymentMethodId,
+      paymentTermId,
+      installmentsPlan,
     } = createDto;
 
-    // 1. CARREGAMENTO DOS DEPÓSITOS (Vendedor e Matriz)
+    // Padronização do ID do usuário (Geralmente é user.id vindo do AuthGuard)
+    const currentUserId = user.id || user.userId;
 
-    // Busca depósito do Vendedor (Se existir)
+    // Define quem é o vendedor responsável (Se for admin vendendo, pode ser null ou ele mesmo)
+    // Se quiser que Admins também ganhem comissão, remova a verificação de role.
+    const sellerId = user.role === 'SELLER' ? currentUserId : null;
+
+    // 1. CARREGAMENTO DOS DEPÓSITOS
     const sellerWarehouse = await this.prisma.warehouse.findFirst({
-      where: { tenantId, responsibleUserId: user.userId },
+      where: { tenantId, responsibleUserId: currentUserId },
     });
 
-    // Busca depósito da Matriz (Default)
     const matrixWarehouse = await this.prisma.warehouse.findFirst({
       where: { tenantId, isDefault: true },
     });
 
-    // Validação básica
     if (!sellerWarehouse && !matrixWarehouse) {
       throw new BadRequestException('Nenhum depósito configurado no sistema.');
     }
 
-    // 2. VALIDAÇÃO DO CLIENTE E ENDEREÇO
+    // 2. VALIDAÇÃO DO CLIENTE
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
       include: { addresses: true },
@@ -66,25 +75,15 @@ export class SalesService {
     const originState = tenant?.billingProfile?.stateUf || 'PR';
     const destinationState = deliveryAddress.state;
 
-    // --- INÍCIO DA TRANSAÇÃO ---
+    // --- INÍCIO DA TRANSAÇÃO (Estoque + Pedido) ---
     const order = await this.prisma.$transaction(async (tx) => {
       let subtotal = 0;
       let totalIcms = 0;
       let totalIpi = 0;
-
-      // Flag para controlar o status do pedido
-      // Se pegar algo da matriz (e o usuário for seller), vira SEPARATION
       let needsSeparation = false;
 
-      const orderItemsData: Array<{
-        productId: string;
-        quantity: number;
-        unitPrice: number;
-        discount: number;
-        totalPrice: number;
-        icmsRate: number;
-        ipiRate: number;
-      }> = [];
+      const orderItemsData: Prisma.OrderItemUncheckedCreateWithoutOrderInput[] =
+        [];
 
       for (const itemDto of items) {
         const product = await tx.product.findUnique({
@@ -102,11 +101,9 @@ export class SalesService {
         }
 
         const quantityToSell = Number(itemDto.quantity);
-
-        // --- LÓGICA DE BAIXA DE ESTOQUE HÍBRIDA ---
         let sourceWarehouseId: string | null = null;
 
-        // A. Tenta no Depósito do Vendedor (Prioridade)
+        // A. Tenta no Depósito do Vendedor
         if (sellerWarehouse) {
           const sellerStock = await tx.stockItem.findUnique({
             where: {
@@ -122,7 +119,7 @@ export class SalesService {
           }
         }
 
-        // B. Se não tem no Vendedor, tenta na Matriz (Fallback)
+        // B. Se não tem no Vendedor, tenta na Matriz
         if (!sourceWarehouseId && matrixWarehouse) {
           const matrixStock = await tx.stockItem.findUnique({
             where: {
@@ -135,22 +132,19 @@ export class SalesService {
 
           if (matrixStock && Number(matrixStock.quantity) >= quantityToSell) {
             sourceWarehouseId = matrixWarehouse.id;
-
-            // Se quem está vendendo é SELLER e usou estoque da MATRIZ
             if (user.role === 'SELLER') {
               needsSeparation = true;
             }
           }
         }
 
-        // C. Se não achou em lugar nenhum
         if (!sourceWarehouseId) {
           throw new BadRequestException(
-            `Estoque insuficiente para "${product.name}". Verifique o saldo no seu depósito e na matriz.`,
+            `Estoque insuficiente para "${product.name}".`,
           );
         }
 
-        // D. Executa a Baixa no Depósito Escolhido
+        // C. Executa a Baixa
         await tx.stockItem.update({
           where: {
             productId_warehouseId: {
@@ -161,17 +155,7 @@ export class SalesService {
           data: { quantity: { decrement: quantityToSell } },
         });
 
-        // E. Registra Kardex
-        // Calcula o saldo após a movimentação
-        const stockAfterMovement = await tx.stockItem.findUnique({
-          where: {
-            productId_warehouseId: {
-              productId: product.id,
-              warehouseId: sourceWarehouseId,
-            },
-          },
-        });
-
+        // D. Registra Kardex
         await tx.stockMovement.create({
           data: {
             tenantId,
@@ -183,16 +167,14 @@ export class SalesService {
               : 'Venda (Pronta Entrega)',
             fromWarehouseId: sourceWarehouseId,
             costPrice: product.costPrice,
-            userId: user.id,
-            balanceAfter: stockAfterMovement
-              ? Number(stockAfterMovement.quantity)
-              : 0,
+            userId: currentUserId,
+            balanceAfter: 0,
           },
         });
 
-        // --- CÁLCULOS (Preço e Impostos) ---
+        // --- CÁLCULOS ---
         const priceObj = product.prices[0];
-        let unitPrice = priceObj ? Number(priceObj.price) : 0;
+        const unitPrice = priceObj ? Number(priceObj.price) : 0;
 
         if (unitPrice === 0)
           throw new BadRequestException(`Produto ${product.name} sem preço.`);
@@ -203,7 +185,6 @@ export class SalesService {
         let icmsRate = 0;
         let ipiRate = 0;
 
-        // (Lógica de impostos mantida...)
         if (product.taxProfile) {
           let rule = product.taxProfile.rules.find(
             (r) =>
@@ -233,27 +214,24 @@ export class SalesService {
         orderItemsData.push({
           productId: product.id,
           quantity: quantityToSell,
-          unitPrice: unitPrice,
+          unitPrice,
           discount: itemDiscount,
           totalPrice: totalItem,
-          icmsRate: icmsRate,
-          ipiRate: ipiRate,
+          icmsRate,
+          ipiRate,
         });
       }
 
       const finalTotal = subtotal + Number(shipping) - Number(discount);
-
-      // --- DEFINIÇÃO DO STATUS ---
-      // Se needsSeparation for true (Seller vendeu da matriz), status é SEPARATION.
-      // Caso contrário, é CONFIRMED (Venda normal).
       const finalStatus = needsSeparation
         ? OrderStatus.SEPARATION
         : OrderStatus.CONFIRMED;
 
-      // Cria Pedido
+      // Criação do Pedido
       return tx.order.create({
         data: {
           tenantId,
+          paymentTermId,
           customerId,
           priceListId,
           status: finalStatus,
@@ -262,6 +240,7 @@ export class SalesService {
           shipping: Number(shipping),
           total: finalTotal,
           totalIcms,
+          sellerId: sellerId, // <--- Usando a variável corrigida
           totalIpi,
           items: {
             create: orderItemsData,
@@ -274,48 +253,124 @@ export class SalesService {
       });
     });
 
-    // --- GERAÇÃO FINANCEIRA ---
-    if (installments && installments.length > 0) {
-      for (const inst of installments) {
-        await this.financialService.createReceivable(
-          {
-            titleNumber: `PED-${order.code}/${inst.number}`,
-            description: `Venda Pedido #${order.code}`,
-            amount: Number(inst.amount),
-            dueDate: inst.dueDate,
-            customerId: customerId,
-            orderId: order.id,
-            paymentMethod: paymentMethod,
-          },
-          tenantId,
-        );
-      }
-    } else {
-      await this.financialService.createReceivable(
-        {
-          titleNumber: `PED-${order.code}/U`,
-          description: `Venda à Vista - Pedido #${order.code}`,
-          amount: Number(order.total),
-          dueDate: new Date().toISOString(),
-          customerId: customerId,
-          orderId: order.id,
-          paymentMethod: paymentMethod,
-        },
+    // --- 3. INTEGRAÇÕES PÓS-VENDA (Assíncronas ou Sequenciais) ---
+
+    // A. Gerar Financeiro (Contas a Receber)
+    try {
+      await this.financialService.generateTitlesFromCondition({
         tenantId,
-      );
+        userId: currentUserId,
+        type: 'RECEIVABLE',
+        totalAmount: Number(order.total),
+        docNumber: order.code ? String(order.code) : order.id.slice(0, 8),
+        descriptionPrefix: 'Venda Pedido',
+        customerId: customerId,
+        orderId: order.id,
+        paymentTermId,
+        installmentsPlan,
+        paymentMethodId,
+        startDate: new Date(),
+      });
+    } catch (error) {
+      this.logger.error(`Erro financeiro Pedido ${order.id}: ${error.message}`);
+      // Não damos throw aqui para não cancelar a venda se o financeiro falhar,
+      // mas o ideal seria ter uma fila de retry.
+    }
+
+    // B. Gerar Comissão (NOVO)
+    if (sellerId) {
+      try {
+        this.logger.log(`Calculando comissão para o vendedor ${sellerId}...`);
+        await this.commissionsService.calculateAndRegister(order.id, tenantId);
+      } catch (error) {
+        this.logger.error(
+          `Erro ao calcular comissão Pedido ${order.id}: ${error.message}`,
+        );
+        // Logamos o erro, mas não falhamos a venda. O Admin pode recalcular depois se necessário.
+      }
     }
 
     return order;
   }
 
-  async findAll(tenantId: string) {
-    return this.prisma.order.findMany({
-      where: { tenantId },
-      include: {
-        customer: { select: { name: true } },
-        _count: { select: { items: true } },
-      },
+  // --- MÉTODOS DE CONSULTA ---
+
+  async findAll(tenantId: string, user: any) {
+    const whereClause: Prisma.OrderWhereInput = {
+      tenantId,
+    };
+
+    if (user.role === 'SELLER') {
+      whereClause.sellerId = user.id;
+    }
+
+    const orders = await this.prisma.order.findMany({
+      where: whereClause,
       orderBy: { createdAt: 'desc' },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            document: true,
+          },
+        },
+        seller: {
+          select: { name: true },
+        },
+        items: {
+          select: {
+            id: true,
+            quantity: true,
+            unitPrice: true,
+            discount: true,
+            totalPrice: true,
+            product: {
+              select: {
+                sku: true,
+                name: true,
+                images: {
+                  take: 1,
+                  select: { url: true },
+                },
+              },
+            },
+          },
+        },
+        priceList: {
+          select: { name: true },
+        },
+        paymentTerm: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        // NOVO: Buscamos 1 título para pegar o método e total de parcelas
+        financialTitles: {
+          take: 1,
+          select: {
+            totalInstallments: true,
+            paymentMethod: {
+              select: { name: true },
+            },
+          },
+        },
+      },
+    });
+
+    // Transformação para facilitar o uso no Front-end
+    return orders.map((order) => {
+      const mainTitle = order.financialTitles[0];
+
+      return {
+        ...order,
+        paymentInfo: {
+          methodName: mainTitle?.paymentMethod?.name || 'Não definido',
+          installments: mainTitle?.totalInstallments || 0,
+          termName: order.paymentTerm?.name || 'À vista',
+        },
+      };
     });
   }
 
@@ -338,5 +393,17 @@ export class SalesService {
     }
 
     return order;
+  }
+
+  async updateStatus(id: string, tenantId: string, newStatus: OrderStatus) {
+    const order = await this.prisma.order.findUnique({ where: { id } });
+    if (!order || order.tenantId !== tenantId) {
+      throw new NotFoundException('Pedido não encontrado');
+    }
+
+    return this.prisma.order.update({
+      where: { id },
+      data: { status: newStatus },
+    });
   }
 }

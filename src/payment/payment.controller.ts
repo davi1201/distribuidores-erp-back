@@ -2,46 +2,60 @@ import {
   Controller,
   Post,
   Body,
+  Req,
   UseGuards,
-  HttpCode,
-  HttpStatus,
   Headers,
+  RawBodyRequest,
+  Get,
 } from '@nestjs/common';
 import { PaymentService } from './payment.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import * as currentUserDecorator from '../auth/decorators/current-user.decorator';
-
-class SubscribeDto {
-  planSlug: string;
-  cardToken: string; // Token vindo do Pagar.me JS no frontend
-}
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Ou ClerkAuthGuard
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Request } from 'express';
+import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
 
 @Controller('payment')
-// @UseGuards(JwtAuthGuard)
 export class PaymentController {
   constructor(private readonly paymentService: PaymentService) {}
 
-  @UseGuards(JwtAuthGuard)
-  @Post('subscribe')
-  async subscribe(
-    @Body() dto: SubscribeDto,
-    @currentUserDecorator.CurrentUser() user: currentUserDecorator.UserPayload,
-  ) {
-    // Importante: O usuário só pode assinar pro PRÓPRIO tenant
-    if (!user.tenantId) throw new Error('Usuário sem tenant não pode assinar.');
+  @Get('subscription')
+  @UseGuards(ClerkAuthGuard)
+  async getSubscription(@CurrentUser() user: any) {
+    return this.paymentService.getCurrentSubscription(user.tenantId);
+  }
 
-    return this.paymentService.createSubscription(
+  // 1. Criar Sessão de Checkout (Protegido)
+  @Post('checkout')
+  @UseGuards(ClerkAuthGuard) // Use seu ClerkAuthGuard aqui
+  async createCheckoutSession(
+    @CurrentUser() user: any,
+    @Body() body: { planSlug: string; cycle: 'monthly' | 'yearly' },
+  ) {
+    return this.paymentService.createCheckoutSession(
       user.tenantId,
-      dto.planSlug,
-      dto.cardToken,
-      user,
+      body.planSlug,
+      user.email,
+      body.cycle,
     );
   }
 
+  // 2. Portal do Cliente (Gerenciar Assinatura)
+  @Post('portal')
+  @UseGuards(ClerkAuthGuard)
+  async createPortalSession(@CurrentUser() user: any) {
+    return this.paymentService.createPortalSession(user.tenantId);
+  }
+
+  // 3. Webhook (Público)
   @Post('webhook')
-  @HttpCode(HttpStatus.OK) // Retornar 200 é vital, senão a Pagar.me tenta enviar de novo
-  async handleWebhook(@Headers() headers: any, @Body() body: any) {
-    // Não usamos @CurrentUser() aqui porque não tem usuário logado!
-    return this.paymentService.handleWebhook(headers, body);
+  async handleWebhook(
+    @Headers('stripe-signature') signature: string,
+    @Req() req: RawBodyRequest<Request>, // NestJS v9+ suporta rawBody nativo
+  ) {
+    if (!req.rawBody) {
+      throw new Error('RawBody não habilitado no NestJS. Configure no main.ts');
+    }
+
+    return this.paymentService.handleStripeWebhook(signature, req.rawBody);
   }
 }

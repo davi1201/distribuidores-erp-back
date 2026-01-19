@@ -12,9 +12,6 @@ model PriceList {
   // Relacionamentos
   customers Customer[]
 
-  // Futuro: Aqui você terá os preços dos produtos ligados a essa lista
-  // products  ProductPrice[] 
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
