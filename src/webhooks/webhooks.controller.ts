@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Webhook } from 'svix';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { addDays } from 'date-fns';
 
 @Controller('webhooks')
 export class WebhooksController {
@@ -76,6 +77,10 @@ export class WebhooksController {
 
         case 'organizationMembership.deleted':
           await this.unlinkUserFromTenant(data);
+          break;
+
+        case 'organizationInvitation.accepted':
+          await this.acceptInvitation(data);
           break;
       }
     } catch (error) {
@@ -163,6 +168,7 @@ export class WebhooksController {
       create: {
         clerkId: data.id,
         name: data.name,
+        trialEndsAt: addDays(new Date(), 7),
         slug: data.slug || `org-${data.id}`,
         isActive: true,
         plan: {
@@ -230,5 +236,25 @@ export class WebhooksController {
       where: { clerkId: clerkUserId },
       data: { tenantId: null },
     });
+  }
+
+  private async acceptInvitation(data: any) {
+    const user = await this.prisma.user.findUnique({
+      where: { clerkId: data.id },
+    });
+
+    if (!user) {
+      this.logger.warn(
+        `⏳ User para invitation ${data.id} não encontrado. Aguardando user.created.`,
+      );
+      return;
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { clerkId: data.user_id, isActive: true },
+    });
+
+    this.logger.log(`✅ Invitation accepted: User ${data.user_id}`);
   }
 }

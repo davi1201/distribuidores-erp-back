@@ -247,4 +247,12 @@ export class UsersService {
       select: { id: true, name: true },
     });
   }
+
+  async getSellerByTenantId(tenantId: string) {
+    return this.prisma.user.findMany({
+      where: { tenantId, role: Role.SELLER },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    });
+  }
 }

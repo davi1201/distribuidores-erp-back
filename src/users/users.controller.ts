@@ -47,4 +47,10 @@ export class UsersController {
   getAllSellers() {
     return this.usersService.getAllSellers();
   }
+
+  @Get('sellers-by-tenant')
+  @Roles(Role.OWNER, Role.ADMIN)
+  getSellersByTenant(@CurrentUser() user: any) {
+    return this.usersService.getSellerByTenantId(user.tenantId);
+  }
 }

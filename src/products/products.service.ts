@@ -739,8 +739,8 @@ export class ProductsService {
           // 3. Oculta custo base
           baseCost: canViewCost ? Number(p.costPrice) : 0,
           markup: Number(p.markup),
-          prices: salePrices,
         },
+        prices: salePrices,
         supplier: supplierInfo,
         isVariant: !!p.parentId,
         variants: p.variants.map((v) => ({

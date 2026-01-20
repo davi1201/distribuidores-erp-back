@@ -43,4 +43,15 @@ export class SalesController {
   ) {
     return this.salesService.updateStatus(id, user.tenantId || '', newStatus);
   }
+
+  @Patch('approve-manual-commission/:orderId')
+  approveManualCommission(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.salesService.mannualAproveCommission(
+      orderId,
+      user.tenantId || '',
+    );
+  }
 }

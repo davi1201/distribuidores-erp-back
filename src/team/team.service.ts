@@ -101,7 +101,7 @@ export class TeamService {
             email: email,
             role: initialRole, // Sempre SELLER
             tenantId: tenantId,
-            clerkId: `invitation_${invitation.id}`,
+            clerkId: invitation.id,
             isActive: false,
           },
         });

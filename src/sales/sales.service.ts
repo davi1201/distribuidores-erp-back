@@ -273,8 +273,6 @@ export class SalesService {
       });
     } catch (error) {
       this.logger.error(`Erro financeiro Pedido ${order.id}: ${error.message}`);
-      // Não damos throw aqui para não cancelar a venda se o financeiro falhar,
-      // mas o ideal seria ter uma fila de retry.
     }
 
     // B. Gerar Comissão (NOVO)
@@ -313,6 +311,13 @@ export class SalesService {
             id: true,
             name: true,
             document: true,
+          },
+        },
+        commissionRecord: {
+          select: {
+            id: true,
+            commissionAmount: true,
+            status: true,
           },
         },
         seller: {
@@ -405,5 +410,16 @@ export class SalesService {
       where: { id },
       data: { status: newStatus },
     });
+  }
+
+  async mannualAproveCommission(orderId: string, tenantId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+    });
+    if (!order || order.tenantId !== tenantId) {
+      throw new NotFoundException('Pedido não encontrado');
+    }
+
+    await this.commissionsService.calculateAndRegister(order.id, tenantId);
   }
 }

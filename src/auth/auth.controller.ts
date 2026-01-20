@@ -110,6 +110,6 @@ export class AuthController {
       path: '/',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
-    return res.redirect('http://localhost:3005/dashboard');
+    return res.redirect('http://localhost:3005/');
   }
 }
