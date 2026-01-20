@@ -44,6 +44,7 @@ async function bootstrap() {
   await redisIoAdapter.connectToRedis(); // Conecta no Redis antes de subir o app
   app.useWebSocketAdapter(redisIoAdapter); // Aplica o adaptador
 
-  await app.listen(5555);
+  const port = process.env.PORT || 5555;
+  await app.listen(port);
 }
 bootstrap();
