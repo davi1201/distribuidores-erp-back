@@ -17,21 +17,21 @@ export enum PersonType {
 }
 
 class CreateContactDto {
-  @IsString() @IsNotEmpty() name: string;
-  @IsString() @IsNotEmpty() phone: string;
+  @IsString() @IsOptional() name?: string;
+  @IsString() @IsOptional() phone?: string;
   @IsString() @IsOptional() role?: string;
 }
 
 class CreateAddressDto {
-  @IsString() @IsNotEmpty() zipCode: string;
-  @IsString() @IsNotEmpty() street: string;
-  @IsString() @IsNotEmpty() number: string;
+  @IsString() @IsOptional() zipCode?: string;
+  @IsString() @IsOptional() street?: string;
+  @IsString() @IsOptional() number?: string;
   @IsString() @IsOptional() complement?: string;
-  @IsString() @IsNotEmpty() neighborhood: string;
-  @IsString() @IsNotEmpty() city: string;
-  @IsString() @IsNotEmpty() state: string;
+  @IsString() @IsOptional() neighborhood?: string;
+  @IsNumber() @IsOptional() cityCode?: number;
+  @IsNumber() @IsOptional() stateCode?: number;
   @IsString() @IsOptional() ibgeCode?: string;
-  @IsString() @IsNotEmpty() categoryId: string; // ID da categoria criada previamente
+  @IsString() @IsOptional() categoryId?: string; // ID da categoria criada previamente
 }
 
 class CreateAttachmentDto {
@@ -47,29 +47,29 @@ class CreateAttachmentDto {
 export class CreateCustomerDto {
   @IsString() @IsNotEmpty() name: string;
 
-  @IsEmail() @IsNotEmpty() email: string;
+  @IsEmail() @IsOptional() email?: string;
 
   @IsString() @IsOptional() phone?: string;
 
   @IsEnum(PersonType) personType: PersonType;
 
-  @IsString() @IsNotEmpty() document: string; // CPF ou CNPJ
+  @IsString() @IsOptional() document?: string; // CPF ou CNPJ
 
   // --- Regra Condicional PJ ---
   @ValidateIf((o) => o.personType === 'PJ')
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   corporateName?: string;
 
   @ValidateIf((o) => o.personType === 'PJ')
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   tradeName?: string;
 
   // IE é obrigatória se não for isento
   @ValidateIf((o) => o.personType === 'PJ' && !o.isExempt)
   @IsString()
-  @IsNotEmpty()
+  @IsOptional()
   stateRegistration?: string;
 
   @IsBoolean() @IsOptional() isExempt?: boolean;

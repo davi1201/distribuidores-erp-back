@@ -18,7 +18,8 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "stripe:listen": "stripe listen --forward-to localhost:5555/api/v1/payment/webhook"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

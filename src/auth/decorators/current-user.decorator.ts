@@ -3,7 +3,6 @@ import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 export interface UserPayload {
   id: string;
   userId: string;
-  // Mantendo sub como opcional caso já comece a aparecer nos tokens novos
   sub?: string;
   email: string;
   name: string;

@@ -5,6 +5,7 @@ model State {
 
   cities          City[]
   billingProfiles BillingProfile[]
+  Address         Address[]
 
   @@map("states")
 }
@@ -17,6 +18,7 @@ model City {
   ibgeCode String @unique
 
   billingProfiles BillingProfile[]
+  Address         Address[]
 
   @@map("cities")
 }

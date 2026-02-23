@@ -8,10 +8,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { PaymentService } from '../payment/payment.service';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { TenantsService } from '../tenants/tenants.service';
+import { PaymentModule } from 'src/payment/payment.module';
 
 @Module({
   imports: [
     PrismaModule,
+    PaymentModule,
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'default_secret_key',
@@ -19,12 +21,6 @@ import { TenantsService } from '../tenants/tenants.service';
     }),
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    PaymentService,
-    GoogleStrategy,
-    TenantsService,
-  ],
+  providers: [AuthService, JwtStrategy, GoogleStrategy, TenantsService],
 })
 export class AuthModule {}

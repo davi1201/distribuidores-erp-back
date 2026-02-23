@@ -177,13 +177,37 @@ export class WebhooksController {
       },
     });
 
-    await this.prisma.user.update({
-      where: { clerkId: data.created_by },
-      data: { tenantId: tenant.id },
-    });
+    // await this.prisma.user.update({
+    //   where: { clerkId: data.created_by },
+    //   data: { tenantId: tenant.id },
+    // });
+
+    const userIdToUpdate = data.created_by || data.user_id; // Ajuste conforme seu payload
+
+    if (userIdToUpdate) {
+      const userExists = await this.prisma.user.findUnique({
+        where: { clerkId: userIdToUpdate },
+      });
+
+      if (userExists) {
+        // 3. Se existe, faz o update seguro
+        await this.prisma.user.update({
+          where: { clerkId: userIdToUpdate },
+          data: { tenantId: tenant.id },
+        });
+      } else {
+        // 4. Se não existe, apenas loga (não quebra a aplicação)
+        // Isso é comum em ambientes assíncronos
+        this.logger.warn(
+          `Webhook organization.updated: Tentativa de atualizar usuário ${userIdToUpdate}, mas ele não existe no banco local ainda.`,
+        );
+      }
+    }
   }
 
   private async linkUserToTenant(data: any) {
+    console.log('data', data);
+
     const clerkUserId = data.public_user_data.user_id;
     const clerkOrgId = data.organization.id;
     const clerkRole = data.role;
@@ -207,7 +231,6 @@ export class WebhooksController {
     let appRole = 'SELLER';
     if (clerkRole === 'org:admin') appRole = 'ADMIN';
 
-    // Verifica se o user existe antes de tentar update
     const user = await this.prisma.user.findUnique({
       where: { clerkId: clerkUserId },
     });
@@ -224,6 +247,7 @@ export class WebhooksController {
       data: {
         tenantId: tenant.id,
         role: appRole as any,
+        isActive: true,
       },
     });
 

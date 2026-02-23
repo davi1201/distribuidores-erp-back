@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Put,
+  Req,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -115,6 +116,16 @@ export class CustomersController {
     @CurrentUser() user: any,
   ) {
     return this.customersService.create(createCustomerDto, user.tenantId, user);
+  }
+
+  @Post('import')
+  // @UseGuards(JwtAuthGuard) // Se tiver autenticação
+  async import(@Body() body: { items: any[] }, @Req() req: any) {
+    // Pega o tenantId e user do request (assumindo que seu Guard popula isso)
+    const tenantId = req.user.tenantId;
+    const currentUser = req.user;
+
+    return this.customersService.importBulk(body.items, tenantId, currentUser);
   }
 
   @Get()

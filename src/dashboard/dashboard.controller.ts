@@ -12,6 +12,10 @@ export class DashboardController {
 
   @Get('overview')
   async getOverview(@CurrentUser() user: User) {
-    return this.dashboardService.getOverview(user.tenantId || '');
+    return this.dashboardService.getOverview({
+      tenantId: user.tenantId || '',
+      userId: user.id,
+      role: user.role,
+    });
   }
 }

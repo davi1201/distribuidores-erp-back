@@ -34,7 +34,21 @@ export async function createApp() {
   });
 
   await app.init();
-  return server;
+  return app;
 }
 
-export default createApp();
+// 🔥 SOMENTE LOCALHOST
+async function bootstrap() {
+  if (process.env.VERCEL) return;
+
+  const app = await createApp();
+  const port = process.env.PORT || 5555;
+
+  await app.listen(port);
+  console.log(`🚀 API rodando em http://localhost:${port}`);
+}
+
+bootstrap();
+
+// 👇 export usado pelo Vercel
+export default server;

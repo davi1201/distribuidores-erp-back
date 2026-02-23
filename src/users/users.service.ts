@@ -24,7 +24,7 @@ export class UsersService {
             plan: true,
             billingProfile: true,
             subscriptions: {
-              where: { status: { in: ['ACTIVE'] } },
+              where: { status: 'active' },
               orderBy: { currentPeriodEnd: 'desc' },
               take: 1,
             },
@@ -39,6 +39,7 @@ export class UsersService {
     const activeSub = tenant?.subscriptions[0];
     const trialEndsAt = tenant?.trialEndsAt;
     const billingProfile = tenant?.billingProfile;
+    const plan = tenant?.plan;
 
     let status = 'INACTIVE';
     let billingCycle: 'monthly' | 'yearly' | null = null;
@@ -73,9 +74,10 @@ export class UsersService {
       tenantName: tenant?.name,
       tenantSlug: tenant?.slug,
 
-      planSlug: tenant?.plan?.slug,
-      planName: tenant?.plan?.name,
-      planMaxUsers: 3,
+      planSlug: plan?.slug,
+      planName: plan?.name,
+      planMaxUsers: plan?.maxUsers,
+      planId: plan?.id,
 
       status,
       isTrial: status === 'TRIAL',
@@ -85,6 +87,7 @@ export class UsersService {
           : false,
       trialEndsAt,
       subscriptionEndsAt: activeSub?.currentPeriodEnd,
+
       billingCycle,
       isProfileComplete: isProfileCompleteRes.isComplete,
       companyName: billingProfile?.tenantId ? tenant?.name : null,

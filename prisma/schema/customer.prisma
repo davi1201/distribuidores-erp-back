@@ -11,10 +11,10 @@ model Customer {
 
   // Dados Básicos
   name       String
-  email      String
+  email      String?
   phone      String? // Contato principal
   personType PersonType
-  document   String // CPF ou CNPJ
+  document   String? // CPF ou CNPJ
   isActive   Boolean    @default(true)
 
   // Dados PJ (Opcionais se for PF)
@@ -63,8 +63,8 @@ model Customer {
 
 model Contact {
   id    String  @id @default(uuid())
-  name  String
-  phone String
+  name  String?
+  phone String?
   role  String? // Ex: Financeiro, Compras
 
   customerId String
@@ -75,18 +75,22 @@ model Contact {
 
 model Address {
   id           String  @id @default(uuid())
-  zipCode      String
-  street       String
-  number       String
+  zipCode      String?
+  street       String?
+  number       String?
   complement   String?
-  neighborhood String
-  city         String
-  state        String // UF
+  neighborhood String?
+  cityCode     Int?
+  stateCode    Int? // UF
   ibgeCode     String?
 
   // Categoria do Endereço (Entrega, Cobrança, etc)
-  categoryId String
-  category   AddressCategory @relation(fields: [categoryId], references: [id])
+  categoryId String?
+  category   AddressCategory? @relation(fields: [categoryId], references: [id])
+
+  city City? @relation(fields: [cityCode], references: [id])
+
+  state State? @relation(fields: [stateCode], references: [id])
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)

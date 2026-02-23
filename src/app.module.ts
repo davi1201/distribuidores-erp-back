@@ -33,6 +33,7 @@ import { CommissionsService } from './commissions/commissions.service';
 import { CommissionsController } from './commissions/commissions.controller';
 import { CommissionsModule } from './commissions/commissions.module';
 import { PrismaService } from './prisma/prisma.service';
+import { ConfigModule } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -61,6 +62,7 @@ import { PrismaService } from './prisma/prisma.service';
     WebhooksModule,
     PaymentTermModule,
     CommissionsModule,
+    ConfigModule.forRoot({ isGlobal: true }),
   ],
   controllers: [CommissionsController],
   providers: [

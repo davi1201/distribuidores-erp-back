@@ -73,7 +73,7 @@ export class SalesService {
     });
 
     const originState = tenant?.billingProfile?.stateUf || 'PR';
-    const destinationState = deliveryAddress.state;
+    const destinationState = deliveryAddress.stateCode;
 
     // --- INÍCIO DA TRANSAÇÃO (Estoque + Pedido) ---
     const order = await this.prisma.$transaction(async (tx) => {
@@ -189,7 +189,7 @@ export class SalesService {
           let rule = product.taxProfile.rules.find(
             (r) =>
               r.originState === originState &&
-              r.destinationState === destinationState,
+              r.destinationState === String(destinationState),
           );
           if (!rule) {
             rule = product.taxProfile.rules.find(

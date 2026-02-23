@@ -9,14 +9,115 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CategoryDto } from './dto/category.dto';
 import { Role, User } from '@prisma/client';
+import { LocationsService } from 'src/locations/locations.service';
 
 @Injectable()
 export class CustomersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private locationsService: LocationsService,
+  ) {}
 
   // ==================================================================
   // CUSTOMER OPERATIONS
   // ==================================================================
+
+  async importBulk(data: any[], tenantId: string, currentUser: any) {
+    const results = {
+      success: 0,
+      errors: [] as any[],
+    };
+
+    // Busca uma categoria de endereço padrão para usar na importação
+    const defaultAddressCategoryId =
+      await this.getDefaultAddressCategory(tenantId);
+
+    for (const [index, row] of data.entries()) {
+      try {
+        // 1. Resolver Cidade (IBGE ou Nome/UF)
+        let city: { id: number; stateCode: number } | null = null;
+        // Se não veio código, mas veio nome e estado, busca no banco
+
+        const foundCity = await this.locationsService.findCityForImport({
+          ibgeCode: row.address_ibgeCode,
+          cityName: row.address_city,
+          stateUf: row.address_state,
+        });
+
+        if (!foundCity) {
+          throw new BadRequestException(
+            `Cidade não encontrada: ${row.address_city}/${row.address_state}`,
+          );
+        }
+
+        city = { id: foundCity.id, stateCode: foundCity.stateId };
+
+        // 2. Mapeamento (De Linha Excel -> Para DTO)
+        const customerDto: CreateCustomerDto = {
+          name: row.name,
+          email: row.email,
+          document: String(row.document).replace(/\D/g, ''), // Remove pontuação
+          phone: row.phone ? String(row.phone) : undefined,
+          // Normaliza PersonType (Aceita "JURIDICA", "PJ", "J")
+          personType: row.personType,
+          // Dados PJ
+          corporateName: row.corporateName,
+          tradeName: row.tradeName,
+          stateRegistration: row.stateRegistration,
+          municipalRegistration: row.municipalRegistration,
+
+          // Booleanos (Trata "SIM", "TRUE", "1")
+          isExempt: row.isExempt,
+          isFinalConsumer: row.isFinalConsumer === 1 ? true : false,
+          isICMSContributor: row.isICMSContributor === 1 ? true : false,
+
+          // Vínculos
+          sellerId: row.sellerId, // A função create vai validar se pode usar isso
+          priceListId: row.priceListId,
+          creditLimit: row.creditLimit ? Number(row.creditLimit) : 0,
+          // Monta o endereço se houver dados
+          addresses: city
+            ? [
+                {
+                  zipCode: row.address_zipCode.replace(/\D/g, ''),
+                  street: row.address_street,
+                  number: row.address_number
+                    ? String(row.address_number)
+                    : 'S/N',
+                  complement: row.address_complement,
+                  cityCode: city.id, // Código IBGE resolvido
+                  stateCode: city.stateCode, // Ex: PR
+                  ibgeCode: row.address_ibgeCode,
+                  neighborhood: row.address_district,
+                  categoryId: defaultAddressCategoryId, // ID da categoria padrão
+                },
+              ]
+            : [],
+
+          contacts: [], // Implementar se a planilha tiver contatos
+          attachments: [],
+        };
+        // 3. Reutiliza a lógica de criação existente
+        await this.create(customerDto, tenantId, currentUser);
+
+        results.success++;
+      } catch (error) {
+        console.log(error);
+
+        // Registra o erro e continua para a próxima linha
+        results.errors.push({
+          row: index + 1,
+          name: row.name || 'Desconhecido',
+          error:
+            error instanceof BadRequestException
+              ? error.message
+              : 'Erro interno ao processar linha',
+        });
+      }
+    }
+
+    return results;
+  }
 
   async create(
     createCustomerDto: CreateCustomerDto,
@@ -54,9 +155,10 @@ export class CustomersService {
     return this.prisma.customer.create({
       data: {
         ...customerData,
-        sellerId: finalSellerId, // Usa o ID calculado acima
+        sellerId: finalSellerId,
         tenantId,
-
+        document: customerData.document?.replace(/\D/g, '') || null,
+        phone: customerData.phone?.replace(/\D/g, '') || null,
         categoryId: customerData.categoryId || null,
         priceListId: customerData.priceListId || null,
 
@@ -64,7 +166,26 @@ export class CustomersService {
           create: contacts,
         },
         addresses: {
-          create: addresses?.map((addr) => ({ ...addr })),
+          create:
+            addresses?.map((addr) => ({
+              zipCode: addr.zipCode,
+              street: addr.street,
+              number: addr.number,
+              complement: addr.complement,
+              neighborhood: addr.neighborhood,
+              ibgeCode: String(addr.ibgeCode),
+              city: addr.cityCode
+                ? { connect: { id: Number(addr.cityCode) } }
+                : undefined,
+
+              state: addr.stateCode
+                ? { connect: { id: Number(addr.stateCode) } }
+                : undefined,
+
+              category: addr.categoryId
+                ? { connect: { id: addr.categoryId } }
+                : undefined,
+            })) || [],
         },
         attachments: {
           create: attachments || [],
@@ -165,8 +286,8 @@ export class CustomersService {
             number: a.number,
             complement: a.complement,
             neighborhood: a.neighborhood,
-            city: a.city,
-            state: a.state,
+            cityCode: a.cityCode,
+            stateCode: a.stateCode,
             categoryId: a.categoryId,
           })),
         },
@@ -300,5 +421,24 @@ export class CustomersService {
     }
 
     return this.prisma.addressCategory.delete({ where: { id, tenantId } });
+  }
+
+  private async getDefaultAddressCategory(tenantId: string): Promise<string> {
+    const category = await this.prisma.addressCategory.findFirst({
+      where: { tenantId },
+      orderBy: { isSystemDefault: 'desc' }, // Prioriza a padrão do sistema
+    });
+
+    if (category) return category.id;
+
+    // Se não existir nenhuma, cria uma "Padrão" automaticamente
+    const newCategory = await this.prisma.addressCategory.create({
+      data: {
+        description: 'Principal',
+        isSystemDefault: true,
+        tenantId,
+      },
+    });
+    return newCategory.id;
   }
 }
