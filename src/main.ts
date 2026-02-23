@@ -5,8 +5,12 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 
 const server = express();
+let isAppInitialized = false; // Flag para evitar reinicialização no Vercel (Cold Starts)
 
-export async function createApp() {
+export async function bootstrapApp() {
+  // Se já inicializou (warm boot no Vercel), não faz o setup de novo
+  if (isAppInitialized) return server;
+
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
     rawBody: true,
   });
@@ -34,21 +38,26 @@ export async function createApp() {
   });
 
   await app.init();
-  return app;
+  isAppInitialized = true;
+
+  return server;
 }
 
 // 🔥 SOMENTE LOCALHOST
-async function bootstrap() {
-  if (process.env.VERCEL) return;
-
-  const app = await createApp();
-  const port = process.env.PORT || 5555;
-
-  await app.listen(port);
-  console.log(`🚀 API rodando em http://localhost:${port}`);
+if (!process.env.VERCEL) {
+  bootstrapApp().then((srv) => {
+    const port = process.env.PORT || 5555;
+    // No localhost, nós mandamos o Express "escutar" a porta ativamente
+    srv.listen(port, () => {
+      console.log(`🚀 API rodando em http://localhost:${port}`);
+    });
+  });
 }
 
-bootstrap();
-
-// 👇 export usado pelo Vercel
-export default server;
+// 👇 EXPORT USADO PELO VERCEL (Serverless Function)
+export default async (req: any, res: any) => {
+  // 1. Garante que o NestJS montou as rotas no Express
+  await bootstrapApp();
+  // 2. Repassa a requisição HTTP nativa do Vercel para o Express resolver
+  server(req, res);
+};
