@@ -34,6 +34,8 @@ import { CommissionsController } from './commissions/commissions.controller';
 import { CommissionsModule } from './commissions/commissions.module';
 import { PrismaService } from './prisma/prisma.service';
 import { ConfigModule } from '@nestjs/config';
+import { BankReconciliationModule } from './bank-reconciliation/bank-reconciliation.module';
+import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 
 @Module({
   imports: [
@@ -63,6 +65,8 @@ import { ConfigModule } from '@nestjs/config';
     PaymentTermModule,
     CommissionsModule,
     ConfigModule.forRoot({ isGlobal: true }),
+    BankReconciliationModule,
+    BankAccountsModule,
   ],
   controllers: [CommissionsController],
   providers: [

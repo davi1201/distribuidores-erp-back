@@ -52,8 +52,8 @@ model PaymentMethod {
 }
 
 enum CategoryType {
-  INCOME // Receita
-  EXPENSE // Despesa
+  RECEIVABLE
+  PAYABLE
 }
 
 model FinancialCategory {
@@ -132,14 +132,16 @@ model FinancialTitle {
   issueDate      DateTime @default(now())
   dueDate        DateTime
   competenceDate DateTime @default(now())
+  paidAmount     Decimal  @default(0) @db.Decimal(10, 2)
 
   status TitleStatus @default(OPEN)
 
   // Relacionamentos
   movements FinancialMovement[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  paidAt    DateTime?
 
   @@index([tenantId, status])
   @@index([tenantId, dueDate])
@@ -161,24 +163,27 @@ model FinancialMovement {
   amount      Decimal      @db.Decimal(10, 2)
   paymentDate DateTime     @default(now())
 
-  // NOVO: Como foi REALMENTE pago?
-  // Às vezes o título era Boleto, mas o cliente pagou via PIX na hora.
+  
   paymentMethodId String?
   paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
 
-  // Auditoria e Conciliação
+  
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
   observation String?
 
-  bankAccountId String? // Conta bancária onde entrou/saiu o dinheiro
-  reconciled    Boolean   @default(false)
-  reconciledAt  DateTime?
+  
+  bankAccountId String?
+  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
 
-  createdAt     DateTime     @default(now())
-  PaymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
-  paymentTermId String?
+  reconciled   Boolean   @default(false)
+  reconciledAt DateTime?
+
+  createdAt       DateTime         @default(now())
+  PaymentTerm     PaymentTerm?     @relation(fields: [paymentTermId], references: [id])
+  paymentTermId   String?
+  BankTransaction BankTransaction?
 
   @@map("financial_movements")
 }

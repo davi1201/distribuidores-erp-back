@@ -1,0 +1,66 @@
+// Enum para o status da transação bancária
+enum BankTransactionStatus {
+  PENDING
+  RECONCILED
+  IGNORED
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+}
+
+model BankAccount {
+  id           String            @id @default(uuid())
+  tenantId     String
+  name         String // Ex: Conta Itaú Principal
+  agency       String?
+  account      String?
+  statements   BankStatement[]
+  transactions BankTransaction[]
+  isActive     Boolean           @default(true)
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  FinancialMovement FinancialMovement[]
+
+  @@map("bank_accounts")
+}
+
+model BankStatement {
+  id            String   @id @default(uuid())
+  bankAccountId String
+  fileName      String // Ex: extrato-fev.ofx
+  importedAt    DateTime @default(now())
+
+  bankAccount  BankAccount       @relation(fields: [bankAccountId], references: [id])
+  transactions BankTransaction[]
+
+  @@map("bank_statements")
+}
+
+model BankTransaction {
+  id              String @id @default(uuid())
+  bankAccountId   String
+  bankStatementId String
+
+  fitId       String          @unique // ID único gerado pelo banco (vem no OFX)
+  type        TransactionType
+  amount      Decimal         @db.Decimal(10, 2)
+  date        DateTime
+  description String // Ex: "TARIFA PIX" ou "PAG BOLETO"
+
+  status BankTransactionStatus @default(PENDING)
+
+  // AQUI ESTÁ A MUDANÇA CHAVE: 
+  // Apontamos para o Movimento Financeiro (FinancialMovement), que é o registro real da baixa no seu sistema.
+  financialMovementId String? @unique
+
+  financialMovement FinancialMovement? @relation(fields: [financialMovementId], references: [id])
+
+  bankAccount   BankAccount   @relation(fields: [bankAccountId], references: [id])
+  bankStatement BankStatement @relation(fields: [bankStatementId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@map("bank_transactions")
+}

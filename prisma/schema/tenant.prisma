@@ -41,6 +41,7 @@ model Tenant {
   CommissionRule    CommissionRule[]
   CommissionRecord  CommissionRecord[]
   CommissionPayout  CommissionPayout[]
+  BankAccount       BankAccount[]
 
   @@map("tenants")
 }

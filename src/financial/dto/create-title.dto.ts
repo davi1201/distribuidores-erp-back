@@ -67,4 +67,5 @@ export class CreateTitleDto {
 
   @IsString()
   paymentMethodId: string;
+  installments: number;
 }
