@@ -6,6 +6,7 @@ import {
   Param,
   UseGuards,
   Patch,
+  Query,
 } from '@nestjs/common';
 import { SalesService } from './sales.service';
 
@@ -26,8 +27,13 @@ export class SalesController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: User) {
-    return this.salesService.findAll(user.tenantId || '', user);
+  findAll(@CurrentUser() user: User, @Query() query: any) {
+    return this.salesService.findAll(user.tenantId || '', user, {
+      search: query.search,
+      status: query.status,
+      startDate: query.startDate,
+      endDate: query.endDate,
+    });
   }
 
   @Get(':id')

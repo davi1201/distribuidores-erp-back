@@ -28,6 +28,10 @@ export class OrderItemDto {
   @IsNumber()
   @IsOptional()
   discount?: number;
+
+  @IsString()
+  @IsNotEmpty()
+  deliveryType: 'READY' | 'PRE_ORDER';
 }
 
 export class InstallmentPlanDto {

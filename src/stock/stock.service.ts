@@ -361,7 +361,7 @@ export class StockService {
         unit: p.unit,
         imageUrl: p.images[0]?.url,
         quantity: totalQty,
-        variants: [], // Array vazio pois são itens finais
+        variants: [],
       };
     });
   }
@@ -371,8 +371,6 @@ export class StockService {
     userId: string,
     tenantId: string,
   ) {
-    console.log('user', userId);
-
     const transfer = await this.prisma.stockTransfer.create({
       data: {
         tenantId,

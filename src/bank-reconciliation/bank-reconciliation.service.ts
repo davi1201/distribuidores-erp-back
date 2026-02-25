@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ConflictException,
 } from '@nestjs/common';
 import { MatchingEngineService } from './matching-engine.service';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -33,9 +34,17 @@ export class BankReconciliationService {
   // 1. CONCILIAÇÃO BANCÁRIA (Lógica já existente)
   // =========================================================================
 
-  async getPendingTransactions(bankAccountId: string, tenantId: string) {
+  async getPendingTransactions(
+    bankAccountId: string,
+    tenantId: string,
+    bankStatementId?: string, // <-- NOVO: Parâmetro opcional para isolar um OFX
+  ) {
     const pendingBankTxs = await this.prisma.bankTransaction.findMany({
-      where: { bankAccountId, status: 'PENDING' },
+      where: {
+        bankAccountId,
+        status: 'PENDING',
+        ...(bankStatementId && { bankStatementId }), // <-- Filtra pelo OFX se for passado
+      },
       orderBy: { date: 'asc' },
     });
 
@@ -146,8 +155,34 @@ export class BankReconciliationService {
     fileContent: string,
     fileName: string,
     tenantId: string,
+    forceProcess: boolean = false,
   ) {
+    if (!forceProcess) {
+      const existingStatement = await this.prisma.bankStatement.findFirst({
+        where: { bankAccountId, fileName },
+      });
+
+      if (existingStatement) {
+        throw new ConflictException({
+          code: 'FILE_ALREADY_PROCESSED',
+          statementId: existingStatement.id,
+          message: `O arquivo "${fileName}" já foi importado anteriormente. Deseja recuperar os lançamentos pendentes dele?`,
+        });
+      }
+    }
+
+    // 2. Continua o processamento normal se for arquivo novo ou se `forceProcess` for true
     const parsedTransactions = this.ofxParser.parse(fileContent);
+
+    const validTransactions = parsedTransactions.filter(
+      (tx) => tx.fitId && typeof tx.amount === 'number' && !isNaN(tx.amount),
+    );
+
+    if (validTransactions.length === 0) {
+      throw new BadRequestException(
+        'Nenhuma transação válida encontrada neste arquivo OFX.',
+      );
+    }
 
     const statement = await this.prisma.bankStatement.create({
       data: {
@@ -157,7 +192,7 @@ export class BankReconciliationService {
     });
 
     await this.prisma.bankTransaction.createMany({
-      data: parsedTransactions.map((tx) => ({
+      data: validTransactions.map((tx) => ({
         bankAccountId,
         bankStatementId: statement.id,
         fitId: tx.fitId,
@@ -170,7 +205,7 @@ export class BankReconciliationService {
       skipDuplicates: true,
     });
 
-    return this.getPendingTransactions(bankAccountId, tenantId);
+    return this.getPendingTransactions(bankAccountId, tenantId, statement.id);
   }
 
   async getReconciliationHistory(bankAccountId: string, tenantId: string) {

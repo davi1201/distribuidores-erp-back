@@ -79,6 +79,8 @@ export class UsersService {
       planMaxUsers: plan?.maxUsers,
       planId: plan?.id,
 
+      permissions: user.permissions,
+
       status,
       isTrial: status === 'TRIAL',
       isTrialExpired:

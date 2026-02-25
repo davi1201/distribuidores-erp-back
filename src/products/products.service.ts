@@ -776,11 +776,14 @@ export class ProductsService {
     });
     defaultWarehouseId = matrix?.id ?? null;
 
-    // Se for SELLER, busca o depósito dele
+    // Se for SELLER, busca o depósito dele usando o id do usuário atual
+    // Ajuste o user.userId para user.id caso o token do AuthGuard use 'id'
+    const currentUserId = user.id || user.userId;
+
     if (user.role === 'SELLER') {
       const warehouse = await this.prisma.warehouse.findFirst({
         where: {
-          responsibleUserId: user.userId,
+          responsibleUserId: currentUserId,
           tenantId,
         },
         select: { id: true },
@@ -803,29 +806,34 @@ export class ProductsService {
     return products.map((product) => {
       // Monta o nome completo
       const displayName = product.parent
-        ? `${product.name || ''}` // Mantive conforme seu snippet
+        ? `${product.name || ''}`
         : product.name;
 
       let totalStock = 0;
-      let stockInMatrix = 0; // Nova prop para o frontend
+      let stockInMatrix = 0;
 
-      // 2. Lógica de Estoque Condicional
-      if (user.role === 'SELLER' && sellerWarehouseId) {
-        // Busca estoque no depósito do vendedor
-        const sellerEntry = product.stock.find(
-          (s) => s.warehouseId === sellerWarehouseId,
+      // 👇 CORREÇÃO: Busca o estoque da Matriz SEMPRE (independente do cargo ou do estoque do vendedor)
+      if (defaultWarehouseId) {
+        const matrixEntry = product.stock.find(
+          (s) => s.warehouseId === defaultWarehouseId,
         );
-        totalStock = Number(sellerEntry?.quantity || 0);
+        stockInMatrix = Number(matrixEntry?.quantity || 0);
+      }
 
-        // SE O ESTOQUE DO VENDEDOR ESTIVER ZERADO, verifica na Matriz
-        if (totalStock === 0 && defaultWarehouseId) {
-          const matrixEntry = product.stock.find(
-            (s) => s.warehouseId === defaultWarehouseId,
+      // 2. Lógica de Estoque do Vendedor vs Admin
+      if (user.role === 'SELLER') {
+        if (sellerWarehouseId) {
+          // Busca estoque no depósito do vendedor
+          const sellerEntry = product.stock.find(
+            (s) => s.warehouseId === sellerWarehouseId,
           );
-          stockInMatrix = Number(matrixEntry?.quantity || 0);
+          totalStock = Number(sellerEntry?.quantity || 0);
+        } else {
+          // Se o vendedor não tem depósito/carro configurado, o estoque local dele é 0
+          totalStock = 0;
         }
       } else {
-        // ADMIN/OUTROS: Soma tudo
+        // ADMIN/OUTROS: O "totalStock" é a soma de TODOS os depósitos da empresa
         totalStock = product.stock.reduce(
           (acc, s) => acc + Number(s.quantity),
           0,
@@ -837,8 +845,8 @@ export class ProductsService {
       return {
         ...product,
         name: displayName,
-        totalStock,
-        matrixStock: stockInMatrix, // Envia para o front (0 se tiver estoque próprio ou não for seller)
+        totalStock, // Vendedor vê o dele, Admin vê a soma global
+        matrixStock: stockInMatrix, // TODO MUNDO vê o estoque da matriz de forma independente
         basePrice,
       };
     });

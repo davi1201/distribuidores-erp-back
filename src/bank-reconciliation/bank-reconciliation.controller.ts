@@ -6,6 +6,7 @@ import {
   Query,
   BadRequestException,
   UseGuards,
+  Param,
 } from '@nestjs/common';
 import { BankReconciliationService } from './bank-reconciliation.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -71,6 +72,19 @@ export class BankReconciliationController {
     // Fallback de segurança
     throw new BadRequestException(
       'É necessário informar um Título ou um Movimento para realizar a conciliação.',
+    );
+  }
+
+  @Get('pending/:bankAccountId')
+  async getPendingByBankAccount(
+    @Param('bankAccountId') bankAccountId: string,
+    @CurrentUser() user: any,
+    @Query('bankStatementId') bankStatementId?: string,
+  ) {
+    return this.bankReconciliationService.getPendingTransactions(
+      bankAccountId,
+      user.tenantId,
+      bankStatementId,
     );
   }
 

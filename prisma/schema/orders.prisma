@@ -7,6 +7,11 @@ enum OrderStatus {
   COMPLETED // Entregue
 }
 
+enum DeliveryType {
+  READY       // Pronta Entrega
+  PRE_ORDER   // Encomenda (A separar)
+}
+
 model Order {
   id   String @id @default(uuid())
   code Int    @default(autoincrement()) // Número do Pedido (ex: 1001)
@@ -63,6 +68,8 @@ model OrderItem {
   unitPrice  Decimal @db.Decimal(10, 2) // Preço unitário vindo da Tabela
   discount   Decimal @default(0) @db.Decimal(10, 2)
   totalPrice Decimal @db.Decimal(10, 2) // (Unit * Qty) - Discount
+
+  deliveryType DeliveryType @default(READY)
 
   // Impostos do Item (Calculados pelo TaxProfile na hora da venda)
   icmsRate Decimal @default(0) @db.Decimal(5, 2)
