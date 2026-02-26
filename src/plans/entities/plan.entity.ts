@@ -57,6 +57,7 @@ export class PlanEntity implements Plan {
     description: 'Limite de usuários permitidos no plano',
   })
   maxUsers: number;
+  maxBoletos: number;
 
   @ApiProperty()
   createdAt: Date;

@@ -9,8 +9,9 @@ import {
   UseGuards,
   Put,
   Req,
+  Query,
 } from '@nestjs/common';
-import { CustomersService } from './customers.service';
+import { CustomersService, FindCustomersFilters } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CategoryDto } from './dto/category.dto';
@@ -129,8 +130,15 @@ export class CustomersController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: any) {
-    return this.customersService.findAll(user.tenantId, user);
+  findAll(
+    @CurrentUser() user: any,
+    @Query('name') name?: string,
+    @Query('document') document?: string,
+    @Query('state') state?: string,
+    @Query('city') city?: string,
+  ) {
+    const filters: FindCustomersFilters = { name, document, state, city };
+    return this.customersService.findAll(user.tenantId, user, filters);
   }
 
   @Get(':id')

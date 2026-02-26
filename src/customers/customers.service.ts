@@ -11,6 +11,13 @@ import { CategoryDto } from './dto/category.dto';
 import { Role, User } from '@prisma/client';
 import { LocationsService } from 'src/locations/locations.service';
 
+export interface FindCustomersFilters {
+  name?: string;
+  document?: string;
+  state?: string;
+  city?: string;
+}
+
 @Injectable()
 export class CustomersService {
   constructor(
@@ -85,8 +92,8 @@ export class CustomersService {
                     ? String(row.address_number)
                     : 'S/N',
                   complement: row.address_complement,
-                  cityCode: city.id, // Código IBGE resolvido
-                  stateCode: city.stateCode, // Ex: PR
+                  city: city.id, // Código IBGE resolvido
+                  state: city.stateCode, // Ex: PR
                   ibgeCode: row.address_ibgeCode,
                   neighborhood: row.address_district,
                   categoryId: defaultAddressCategoryId, // ID da categoria padrão
@@ -174,12 +181,15 @@ export class CustomersService {
               complement: addr.complement,
               neighborhood: addr.neighborhood,
               ibgeCode: String(addr.ibgeCode),
-              city: addr.cityCode
-                ? { connect: { id: Number(addr.cityCode) } }
+
+              // 👇 Ajustado para ler addr.city
+              city: addr.city
+                ? { connect: { id: Number(addr.city) } }
                 : undefined,
 
-              state: addr.stateCode
-                ? { connect: { id: Number(addr.stateCode) } }
+              // 👇 Ajustado para ler addr.state
+              state: addr.state
+                ? { connect: { id: Number(addr.state) } }
                 : undefined,
 
               category: addr.categoryId
@@ -199,11 +209,44 @@ export class CustomersService {
     });
   }
 
-  async findAll(tenantId: string, currentUser: any) {
+  async findAll(
+    tenantId: string,
+    currentUser: any,
+    filters?: FindCustomersFilters, // Recebe os filtros opcionalmente
+  ) {
     const whereCondition: any = { tenantId };
 
     if (currentUser.role === Role.SELLER) {
       whereCondition.sellerId = currentUser.userId;
+    }
+
+    // 1. Filtro por Nome (busca parcial e ignora maiúsculas/minúsculas)
+    // Busca tanto no nome principal quanto no nome fantasia (se houver)
+    if (filters?.name) {
+      whereCondition.OR = [
+        { name: { contains: filters.name, mode: 'insensitive' } },
+        { tradeName: { contains: filters.name, mode: 'insensitive' } },
+      ];
+    }
+
+    // 2. Filtro por Documento (CPF/CNPJ)
+    if (filters?.document) {
+      whereCondition.document = {
+        contains: filters.document,
+      };
+    }
+
+    // 3. Filtro por Estado e Cidade
+    // Como um cliente tem vários 'addresses', usamos o operador 'some'
+    // Isso traz o cliente se pelo menos UM endereço dele bater com o estado/cidade
+    if (filters?.state || filters?.city) {
+      whereCondition.addresses = {
+        some: {
+          // Converte para Number, já que no erro anterior vimos que a sua API retorna os IDs como números
+          ...(filters.state && { stateId: Number(filters.state) }),
+          ...(filters.city && { cityId: Number(filters.city) }),
+        },
+      };
     }
 
     return this.prisma.customer.findMany({
@@ -213,7 +256,7 @@ export class CustomersService {
         seller: { select: { name: true } },
         category: true,
         priceList: true,
-        addresses: { include: { category: true } },
+        addresses: { include: { category: true, city: true, state: true } },
         attachments: true,
         contacts: true,
       },
@@ -286,8 +329,8 @@ export class CustomersService {
             number: a.number,
             complement: a.complement,
             neighborhood: a.neighborhood,
-            cityCode: a.cityCode,
-            stateCode: a.stateCode,
+            city: a.city,
+            state: a.state,
             categoryId: a.categoryId,
           })),
         },

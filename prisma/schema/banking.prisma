@@ -11,15 +11,19 @@ enum TransactionType {
 }
 
 model BankAccount {
-  id           String            @id @default(uuid())
-  tenantId     String
-  name         String // Ex: Conta Itaú Principal
-  agency       String?
-  account      String?
-  statements   BankStatement[]
-  transactions BankTransaction[]
-  isActive     Boolean           @default(true)
+  id       String  @id @default(uuid())
+  tenantId String
+  name     String // Ex: Conta Itaú Principal
+  agency   String?
+  account  String?
 
+  isDefault Boolean @default(false)
+  pixKey    String?
+
+  isActive Boolean @default(true)
+
+  statements        BankStatement[]
+  transactions      BankTransaction[]
   tenant            Tenant              @relation(fields: [tenantId], references: [id])
   FinancialMovement FinancialMovement[]
 

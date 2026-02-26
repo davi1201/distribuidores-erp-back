@@ -7,6 +7,7 @@ import {
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantsService } from '../tenants/tenants.service';
+import { parse } from 'date-fns';
 
 @Injectable()
 export class UsersService {
@@ -180,6 +181,12 @@ export class UsersService {
         number: data.address.number,
         complement: data.address.complement,
         neighborhood: data.address.neighborhood,
+        birthDate: parse(
+          data.birthDate,
+          'dd/MM/yyyy',
+          new Date(),
+        ).toISOString(),
+
         cityName: city?.name,
         stateUf: state?.uf,
         cityId: city?.id,

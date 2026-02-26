@@ -121,8 +121,12 @@ model FinancialTitle {
   categoryId String?
   category   FinancialCategory? @relation(fields: [categoryId], references: [id])
 
-  createdById String?
-  createdBy   User?   @relation("UserCreatedTitles", fields: [createdById], references: [id])
+  asaasPaymentId String?
+  boletoUrl      String?
+  pixCopyPaste   String?
+  invoiceUrl     String?
+  createdById    String?
+  createdBy      User?   @relation("UserCreatedTitles", fields: [createdById], references: [id])
 
   // Valores
   originalAmount Decimal @db.Decimal(10, 2)
@@ -163,17 +167,14 @@ model FinancialMovement {
   amount      Decimal      @db.Decimal(10, 2)
   paymentDate DateTime     @default(now())
 
-  
   paymentMethodId String?
   paymentMethod   PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
 
-  
   userId String?
   user   User?   @relation(fields: [userId], references: [id])
 
   observation String?
 
-  
   bankAccountId String?
   bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
 

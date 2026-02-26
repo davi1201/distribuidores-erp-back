@@ -8,8 +8,8 @@ enum OrderStatus {
 }
 
 enum DeliveryType {
-  READY       // Pronta Entrega
-  PRE_ORDER   // Encomenda (A separar)
+  READY // Pronta Entrega
+  PRE_ORDER // Encomenda (A separar)
 }
 
 model Order {

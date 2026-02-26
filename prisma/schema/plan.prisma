@@ -4,19 +4,17 @@ model Plan {
   name            String
   slug            String  @unique
 
-  // Preços Visuais (Para exibir no frontend)
-  price       Decimal  @db.Decimal(10, 2) // Mensal
-  yearlyPrice Decimal? @db.Decimal(10, 2) // Anual
+  price       Decimal  @db.Decimal(10, 2)
+  yearlyPrice Decimal? @db.Decimal(10, 2)
 
-  // IDs da Stripe (Para processar o pagamento)
   stripeMonthlyPriceId String?
   stripeYearlyPriceId  String?
 
   isActive Boolean @default(true)
-  features Json? // Outras features (ex: "tem_api": true)
+  features Json?
 
-  // Limite de usuários explícito (1 = Só o dono)
-  maxUsers Int @default(1)
+  maxUsers   Int @default(1)
+  maxBoletos Int @default(0) // 👈 NOVO: O limite que vem do Stripe
 
   description String?
 

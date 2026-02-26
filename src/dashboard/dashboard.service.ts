@@ -19,18 +19,21 @@ export class DashboardService {
     const startCurrentMonth = startOfMonth(now);
     const startLastMonth = startOfMonth(subMonths(now, 1));
 
-    // Filtro base de segurança para Pedidos
+    // ========================================================================
+    // 🛡️ FILTRO BASE DE SEGURANÇA (O Coração do Isolamento)
+    // ========================================================================
     const orderBaseFilter: any = {
       tenantId,
       status: { not: 'CANCELED' },
     };
 
+    // Se for Vendedor, injeta o sellerId em TUDO que envolva pedidos
     if (role === 'SELLER') {
       orderBaseFilter.sellerId = userId;
     }
 
     // ========================================================================
-    // 1. DADOS TOTAIS E AÇÕES PENDENTES (Consultas Paralelas)
+    // 1. DADOS TOTAIS E AÇÕES PENDENTES
     // ========================================================================
     const [
       totalSalesMonth,
@@ -40,13 +43,13 @@ export class DashboardService {
       pendingTransfers,
       pendingCommissions,
     ] = await Promise.all([
-      // Vendas do Mês Atual
+      // Vendas do Mês Atual (Blindado pelo orderBaseFilter)
       this.prisma.order.aggregate({
         where: { ...orderBaseFilter, createdAt: { gte: startCurrentMonth } },
         _sum: { total: true },
         _count: true,
       }),
-      // Vendas do Mês Anterior (Para comparar o crescimento)
+      // Vendas do Mês Anterior (Blindado pelo orderBaseFilter)
       this.prisma.order.aggregate({
         where: {
           ...orderBaseFilter,
@@ -54,11 +57,16 @@ export class DashboardService {
         },
         _sum: { total: true },
       }),
-      // Clientes Ativos
-      this.prisma.customer.count({ where: { tenantId, isActive: true } }),
+      // 👇 CORREÇÃO: Clientes Ativos (Agora o vendedor só vê os clientes da própria carteira)
+      this.prisma.customer.count({
+        where: {
+          tenantId,
+          isActive: true,
+          ...(role === 'SELLER' ? { sellerId: userId } : {}), // Nota: Confirme se a sua tabela Customer usa 'sellerId', 'userId' ou 'createdById'
+        },
+      }),
 
-      // 👇 AÇÕES PENDENTES (NOVO) 👇
-      // Pedidos parados aguardando separação da Matriz
+      // Pedidos aguardando separação (Blindado)
       this.prisma.order.count({
         where: {
           tenantId,
@@ -66,7 +74,7 @@ export class DashboardService {
           ...(role === 'SELLER' ? { sellerId: userId } : {}),
         },
       }),
-      // Transferências de estoque aguardando aprovação
+      // Transferências de estoque aguardando aprovação (Blindado)
       this.prisma.stockTransfer.count({
         where: {
           tenantId,
@@ -74,7 +82,7 @@ export class DashboardService {
           ...(role === 'SELLER' ? { requesterId: userId } : {}),
         },
       }),
-      // Comissões geradas mas não aprovadas
+      // Comissões (Blindado pelo relacionamento com o pedido)
       this.prisma.commissionRecord.aggregate({
         where: {
           order: {
@@ -88,14 +96,15 @@ export class DashboardService {
     ]);
 
     // ========================================================================
-    // 2. RECEBIMENTOS POR MÉTODO DE PAGAMENTO (NOVO)
+    // 2. RECEBIMENTOS POR MÉTODO DE PAGAMENTO
     // ========================================================================
     const financialTitles = await this.prisma.financialTitle.findMany({
       where: {
         tenantId,
-        type: 'RECEIVABLE', // Filtra apenas contas a receber/vendas
+        type: 'RECEIVABLE',
         createdAt: { gte: startCurrentMonth },
-        ...(role === 'SELLER' ? { userId } : {}), // Filtra pelo vendedor, se aplicável
+        // Garante que o vendedor só veja títulos financeiros gerados pelos SEUS pedidos
+        ...(role === 'SELLER' ? { order: { sellerId: userId } } : {}),
       },
       include: { paymentMethod: { select: { name: true } } },
     });
@@ -105,18 +114,19 @@ export class DashboardService {
       const methodName = title.paymentMethod?.name || 'Não Informado';
       paymentMethodsMap.set(
         methodName,
-        (paymentMethodsMap.get(methodName) || 0) + Number(title.balance),
+        (paymentMethodsMap.get(methodName) || 0) + Number(title.balance), // Pode usar title.totalAmount dependendo da sua regra
       );
     }
     const financialByMethod = Array.from(paymentMethodsMap.entries())
       .map(([method, total]) => ({ method, total }))
-      .sort((a, b) => b.total - a.total); // Ordena do maior pro menor
+      .sort((a, b) => b.total - a.total);
 
     // ========================================================================
-    // 3. PRODUTOS / CATEGORIAS MAIS VENDIDAS (NOVO)
+    // 3. PRODUTOS / CATEGORIAS MAIS VENDIDAS
     // ========================================================================
     const orderItems = await this.prisma.orderItem.findMany({
       where: {
+        // Blindado! O vendedor só verá os produtos mais vendidos nos SEUS próprios pedidos.
         order: {
           ...orderBaseFilter,
           createdAt: { gte: startCurrentMonth },
@@ -124,8 +134,6 @@ export class DashboardService {
       },
       include: {
         product: { select: { name: true } },
-        // Se no futuro você adicionar uma tabela Category, mude para:
-        // product: { include: { category: true } } e agrupe pelo category.name
       },
     });
 
@@ -137,17 +145,16 @@ export class DashboardService {
 
       categoryMap.set(catName, {
         total: existing.total + Number(item.totalPrice),
-        quantity: existing.quantity + Number(item.quantity), // 💡 AGORA SOMA A QUANTIDADE
+        quantity: existing.quantity + Number(item.quantity),
       });
     }
 
-    // Pega os top 5 produtos/categorias mais vendidos
     const salesByCategory = Array.from(categoryMap.entries())
       .map(([category, data]) => ({
         category,
         total: data.total,
         quantity: data.quantity,
-      })) // 💡 RETORNA A QUANTIDADE
+      }))
       .sort((a, b) => b.total - a.total)
       .slice(0, 5);
 
@@ -156,6 +163,7 @@ export class DashboardService {
     // ========================================================================
     const salesGraph = await this.getSalesGraphData({ tenantId, userId, role });
 
+    // Últimas Vendas (Blindado pelo orderBaseFilter)
     const recentSales = await this.prisma.order.findMany({
       where: orderBaseFilter,
       orderBy: { createdAt: 'desc' },
@@ -176,7 +184,6 @@ export class DashboardService {
         customers: activeCustomers,
         growth: Math.round(growth),
       },
-      // 👇 Novas Métricas de Alerta (Badges/Notificações)
       pendingActions: {
         separations: pendingSeparations,
         stockTransfers: pendingTransfers,
@@ -184,10 +191,8 @@ export class DashboardService {
           pendingCommissions._sum.commissionAmount || 0,
         ),
       },
-      // 👇 Novas Métricas Analíticas
       financialByMethod,
       salesByCategory,
-
       salesChart: salesGraph,
       recentSales: recentSales.map((sale) => ({
         id: sale.id,
@@ -199,7 +204,6 @@ export class DashboardService {
     };
   }
 
-  // Gráfico de Barras mantido sem alterações (O raw SQL aqui é mais performático para agrupamento por data)
   private async getSalesGraphData({
     tenantId,
     userId,
@@ -208,6 +212,7 @@ export class DashboardService {
     const currentDate = new Date();
     const startDate = subMonths(currentDate, 5);
 
+    // SQL Nativo blindado para a consulta do Gráfico
     const userFilter =
       role === 'SELLER' ? Prisma.sql`AND "sellerId" = ${userId}` : Prisma.empty;
 

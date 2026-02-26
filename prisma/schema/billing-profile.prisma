@@ -20,6 +20,8 @@ model BillingProfile {
   stateId Int?
   state   State? @relation(fields: [stateId], references: [id])
 
+  birthDate DateTime?
+
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

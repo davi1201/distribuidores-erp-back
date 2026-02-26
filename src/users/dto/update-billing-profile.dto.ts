@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsEnum,
+  IsDate,
+} from 'class-validator';
 
 export class UpdateBillingProfileDto {
   @IsEnum(['PF', 'PJ'])
@@ -41,4 +47,8 @@ export class UpdateBillingProfileDto {
   state: string; // UF
   ibgeCode: any;
   email: any;
+
+  @IsDate()
+  @IsNotEmpty()
+  birthDate: Date;
 }

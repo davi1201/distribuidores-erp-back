@@ -28,8 +28,8 @@ class CreateAddressDto {
   @IsString() @IsOptional() number?: string;
   @IsString() @IsOptional() complement?: string;
   @IsString() @IsOptional() neighborhood?: string;
-  @IsNumber() @IsOptional() cityCode?: number;
-  @IsNumber() @IsOptional() stateCode?: number;
+  @IsNumber() @IsOptional() city?: number;
+  @IsNumber() @IsOptional() state?: number;
   @IsString() @IsOptional() ibgeCode?: string;
   @IsString() @IsOptional() categoryId?: string; // ID da categoria criada previamente
 }

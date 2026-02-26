@@ -1,47 +1,64 @@
 model Tenant {
-  id             String          @id @default(uuid())
-  slug           String          @unique // URL da empresa (ex: app.sistema.com/slug)
-  name           String // Nome de exibição
-  isActive       Boolean         @default(true)
-  clerkId        String?         @unique
+  id       String  @id @default(uuid())
+  slug     String  @unique // URL da empresa (ex: app.sistema.com/slug)
+  name     String // Nome de exibição
+  isActive Boolean @default(true)
+  clerkId  String? @unique
+  logoUrl  String?
+
+  // --- Assinatura e Plano ---
+  planId         String // Dica: Se o tenant puder ser criado antes de pagar, mude para String?
+  plan           Plan            @relation(fields: [planId], references: [id])
+  trialEndsAt    DateTime?
   billingProfile BillingProfile?
+  subscriptions  Subscription[]
 
-  planId      String
-  plan        Plan      @relation(fields: [planId], references: [id])
-  trialEndsAt DateTime?
-  logoUrl     String?
+  // --- Integração Financeira (Asaas) ---
+  asaasApiKey   String? // A chave exclusiva deste Tenant (Subconta)
+  asaasWalletId String? // ID da carteira dele no Asaas
 
+  // =====================================================================
+  // CONTROLE DE LIMITES (Arquitetura Dois Baldes)
+  // =====================================================================
+  // Balde 1: Vem do Plano. Reseta para o valor de Plan.maxBoletos a cada renovação
+  monthlyBoletoBalance Int @default(0)
+
+  // Balde 2: Pacote Avulso. Não expira, apenas acumula e decrementa
+  extraBoletoBalance Int @default(0)
+  // =====================================================================
+
+  // --- Relacionamentos do ERP ---
   users              User[]
   customers          Customer[]
   addressCategories  AddressCategory[]
   customerCategories CustomerCategory[]
   priceLists         PriceList[]
-  subscriptions      Subscription[]
   attachments        Attachment[]
   products           Product[]
   taxProfiles        TaxProfile[]
   financialTitles    FinancialTitle[]
   financialMovements FinancialMovement[]
+  StockMovement      StockMovement[]
+  Order              Order[]
+  Invite             Invite[]
+  Warehouse          Warehouse[]
+  Supplier           Supplier[]
+  ProductSupplier    ProductSupplier[]
+  StockTransfer      StockTransfer[]
+  NfeInbox           NfeInbox[]
+  FinancialCategory  FinancialCategory[]
+  PaymentTerm        PaymentTerm[]
+  PaymentMethod      PaymentMethod[]
+  ProductPrice       ProductPrice[]
+  CommissionRule     CommissionRule[]
+  CommissionRecord   CommissionRecord[]
+  CommissionPayout   CommissionPayout[]
+  BankAccount        BankAccount[]
 
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  StockMovement     StockMovement[]
-  Order             Order[]
-  Invite            Invite[]
-  Warehouse         Warehouse[]
-  Supplier          Supplier[]
-  ProductSupplier   ProductSupplier[]
-  StockTransfer     StockTransfer[]
-  NfeInbox          NfeInbox[]
   TenantEmailConfig TenantEmailConfig?
-  FinancialCategory FinancialCategory[]
-  PaymentTerm       PaymentTerm[]
-  PaymentMethod     PaymentMethod[]
-  ProductPrice      ProductPrice[]
-  CommissionRule    CommissionRule[]
-  CommissionRecord  CommissionRecord[]
-  CommissionPayout  CommissionPayout[]
-  BankAccount       BankAccount[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("tenants")
 }
@@ -54,7 +71,7 @@ model TenantEmailConfig {
   host     String // ex: imap.gmail.com
   port     Int     @default(993)
   user     String // email
-  password String // senha de app (criptografada idealmente)
+  password String  @db.Text // Usando @db.Text caso o hash de criptografia fique muito grande
   isActive Boolean @default(true)
 
   createdAt DateTime @default(now())

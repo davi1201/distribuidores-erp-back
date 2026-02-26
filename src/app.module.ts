@@ -36,6 +36,9 @@ import { PrismaService } from './prisma/prisma.service';
 import { ConfigModule } from '@nestjs/config';
 import { BankReconciliationModule } from './bank-reconciliation/bank-reconciliation.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
+import { AsaasService } from './asaas/asaas.service';
+import { AsaasModule } from './asaas/asaas.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -67,6 +70,8 @@ import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
     ConfigModule.forRoot({ isGlobal: true }),
     BankReconciliationModule,
     BankAccountsModule,
+    AsaasModule,
+    MailModule,
   ],
   controllers: [CommissionsController],
   providers: [

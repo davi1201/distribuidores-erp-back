@@ -29,6 +29,8 @@ model Customer {
   isICMSContributor Boolean @default(false)
   invoiceNotes      String? @db.Text
 
+  asaasId String?
+
   // Configurações Financeiras / Vendas
   priceListId        String? // Vinculo com Tabela de Preço (Futuro)
   paymentConditionId String? // Vinculo com Condição Pagto (Futuro)

@@ -22,7 +22,7 @@ export class PaymentService {
     this.stripe = new Stripe(
       this.configService.getOrThrow<string>('STRIPE_SECRET_KEY'),
       {
-        apiVersion: '2025-11-17.clover' as any, // Ajuste de versão se necessário
+        apiVersion: '2025-11-17.clover' as any,
       },
     );
   }
@@ -51,8 +51,8 @@ export class PaymentService {
     }
 
     const sessionConfig: Stripe.Checkout.SessionCreateParams = {
-      payment_method_types: ['card', 'pix'],
-      ui_mode: 'embedded', // 👈 obrigatório para parcelamento aparecer
+      payment_method_types: ['card'],
+      ui_mode: 'embedded',
       customer_email: userEmail,
       line_items: [{ price: priceId, quantity: 1 }],
       metadata: { tenantId, planSlug },
@@ -73,13 +73,6 @@ export class PaymentService {
 
     const session = await this.stripe.checkout.sessions.create(sessionConfig);
 
-    // Adicione isso temporariamente para debug
-    console.log(
-      'Session payment_method_options:',
-      JSON.stringify(session.payment_method_options, null, 2),
-    );
-
-    // No modo embedded, retorna o clientSecret (não a URL)
     return { clientSecret: session.client_secret };
   }
 
@@ -133,7 +126,6 @@ export class PaymentService {
 
         case 'customer.subscription.created':
         case 'customer.subscription.updated':
-          // Lógica vital para troca de plano
           await this.handleSubscriptionUpdated(object as Stripe.Subscription);
           break;
 
@@ -168,6 +160,28 @@ export class PaymentService {
   // --- HANDLERS ---
 
   private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
+    // 💡 NOVO: Tratamento para compra de pacotes avulsos (Pagamento Único)
+    if (session.mode === 'payment') {
+      const tenantId = session.metadata?.tenantId;
+      const type = session.metadata?.type;
+
+      // Se for a compra de um pacote de boletos extras
+      if (tenantId && type === 'extra_boletos') {
+        const amount = parseInt(session.metadata?.amount || '0', 10);
+
+        if (amount > 0) {
+          await this.prisma.tenant.update({
+            where: { id: tenantId },
+            data: { extraBoletoBalance: { increment: amount } }, // 👈 Injeta no balde que NÃO expira
+          });
+          this.logger.log(
+            `Adicionado ${amount} boletos extras ao Tenant: ${tenantId}`,
+          );
+        }
+      }
+      return; // Interrompe pois não é uma assinatura
+    }
+
     if (session.mode !== 'subscription') return;
 
     const tenantId = session.metadata?.tenantId;
@@ -187,7 +201,6 @@ export class PaymentService {
       subscriptionId,
     )) as any;
 
-    // Calculo seguro de datas
     const now = new Date();
     const startDate = stripeSub.current_period_start
       ? new Date(stripeSub.current_period_start * 1000)
@@ -201,9 +214,7 @@ export class PaymentService {
       ? endDate
       : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    // Transaction para garantir consistência
     await this.prisma.$transaction(async (tx) => {
-      // 1. Atualiza Assinatura
       await tx.subscription.upsert({
         where: { externalId: subscriptionId },
         create: {
@@ -223,31 +234,25 @@ export class PaymentService {
         },
       });
 
-      // 2. Atualiza Tenant
       await tx.tenant.update({
         where: { id: tenantId },
         data: {
-          isActive: true, // Checkout completado = ativo
+          isActive: true,
           planId: plan.id,
+          monthlyBoletoBalance: plan.maxBoletos, // 👈 CORREÇÃO: Preenche apenas o balde mensal
         },
       });
     });
 
-    // Operações externas (fora da transaction do banco)
     await this.cancelOldSubscriptions(tenantId, subscriptionId);
-    await this.syncClerkMetadata(tenantId, 'active', plan); // Método extraído
+    await this.syncClerkMetadata(tenantId, 'active', plan);
 
     this.logger.log(`Checkout processado com sucesso para Tenant: ${tenantId}`);
   }
 
-  /**
-   * CORREÇÃO PRINCIPAL: handleSubscriptionUpdated
-   * Garante atualização do Tenant quando o plano muda.
-   */
   private async handleSubscriptionUpdated(stripeSub: any) {
     const subscriptionId = stripeSub.id;
 
-    // 1. Busca assinatura atual
     const existingSub = await this.prisma.subscription.findUnique({
       where: { externalId: subscriptionId },
     });
@@ -257,7 +262,6 @@ export class PaymentService {
       return;
     }
 
-    // 2. Identifica o NOVO plano pelo Price ID
     const priceId = stripeSub.items?.data?.[0]?.price?.id;
     if (!priceId) return;
 
@@ -272,12 +276,11 @@ export class PaymentService {
 
     if (!newPlan) {
       this.logger.error(
-        `CRÍTICO: Plano não encontrado no DB para o Price ID ${priceId}. O Tenant não será atualizado.`,
+        `CRÍTICO: Plano não encontrado no DB para o Price ID ${priceId}.`,
       );
       return;
     }
 
-    // 3. Verifica datas
     const now = new Date();
     const startDate = stripeSub.current_period_start
       ? new Date(stripeSub.current_period_start * 1000)
@@ -291,30 +294,27 @@ export class PaymentService {
       ? endDate
       : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // 4. TRANSACTION: Atualiza Subscription E Tenant juntos
     await this.prisma.$transaction(async (tx) => {
-      // Atualiza a tabela de Subscription
       await tx.subscription.update({
         where: { id: existingSub.id },
         data: {
           status: stripeSub.status ?? 'active',
-          planId: newPlan.id, // <--- O Pulo do gato: ID do novo plano
+          planId: newPlan.id,
           currentPeriodStart: validStart,
           currentPeriodEnd: validEnd,
         },
       });
 
-      // Atualiza a tabela de Tenant IMEDIATAMENTE
       await tx.tenant.update({
         where: { id: existingSub.tenantId },
         data: {
-          planId: newPlan.id, // <--- Garante que o Tenant tenha o novo plano
+          planId: newPlan.id,
           isActive: ['active', 'trialing'].includes(stripeSub.status),
+          monthlyBoletoBalance: newPlan.maxBoletos, // 👈 CORREÇÃO: Preenche o balde mensal ao trocar de plano
         },
       });
     });
 
-    // 5. Sincroniza Clerk (Fora da transaction pois é chamada de API)
     await this.syncClerkMetadata(
       existingSub.tenantId,
       stripeSub.status,
@@ -346,14 +346,24 @@ export class PaymentService {
     const periodStart = new Date(invoice.lines.data[0].period.start * 1000);
     const periodEnd = new Date(invoice.lines.data[0].period.end * 1000);
 
-    // Aqui só atualizamos datas, pois o webhook 'updated' cuida da troca de plano
-    await this.prisma.subscription.update({
-      where: { id: subscription.id },
-      data: {
-        status: 'active',
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          status: 'active',
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+
+      // 👈 CORREÇÃO: Renova apenas o balde mensal a cada pagamento de fatura.
+      // O balde extra (extraBoletoBalance) permanece intocado!
+      await tx.tenant.update({
+        where: { id: subscription.tenantId },
+        data: {
+          monthlyBoletoBalance: subscription.plan.maxBoletos,
+        },
+      });
     });
   }
 
@@ -365,13 +375,10 @@ export class PaymentService {
 
     if (!subscriptionId) return;
 
-    // Marca como past_due na subscription
     await this.prisma.subscription.updateMany({
       where: { externalId: subscriptionId },
       data: { status: 'past_due' },
     });
-
-    // Opcional: Desativar tenant imediatamente ou esperar cancelamento
   }
 
   private async handleSubscriptionDeleted(subscription: Stripe.Subscription) {
@@ -399,11 +406,15 @@ export class PaymentService {
 
   // --- HELPERS ---
 
-  // Refatorado para lidar APENAS com Clerk, já que o banco é tratado na transaction
   private async syncClerkMetadata(tenantId: string, status: string, plan: any) {
+    // 👈 Atualizado para buscar os DOIS baldes
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { clerkId: true },
+      select: {
+        clerkId: true,
+        monthlyBoletoBalance: true,
+        extraBoletoBalance: true,
+      },
     });
 
     if (tenant?.clerkId) {
@@ -415,6 +426,9 @@ export class PaymentService {
               plan: plan.slug,
               status,
               maxUsers: plan.maxUsers,
+              maxBoletos: plan.maxBoletos,
+              monthlyBoletoBalance: tenant.monthlyBoletoBalance, // 👈 Sincroniza o saldo do plano
+              extraBoletoBalance: tenant.extraBoletoBalance, // 👈 Sincroniza o pacote extra
             },
           },
         );
@@ -454,6 +468,9 @@ export class PaymentService {
     const maxUsers = product.metadata.maxUsers
       ? parseInt(product.metadata.maxUsers)
       : 1;
+    const maxBoletos = product.metadata.maxBoletos
+      ? parseInt(product.metadata.maxBoletos)
+      : 0;
 
     await this.prisma.plan.upsert({
       where: { stripeProductId: product.id },
@@ -463,6 +480,7 @@ export class PaymentService {
         slug,
         isActive: product.active,
         maxUsers,
+        maxBoletos,
         price: 0,
       },
       update: {
@@ -470,6 +488,7 @@ export class PaymentService {
         description: product.description,
         isActive: product.active,
         maxUsers,
+        maxBoletos,
       },
     });
   }
@@ -519,7 +538,6 @@ export class PaymentService {
       .replace(/\-\-+/g, '-');
   }
 
-  // ... (getCurrentSubscription mantido igual) ...
   async getCurrentSubscription(tenantId: string) {
     const sub = await this.prisma.subscription.findFirst({
       where: {

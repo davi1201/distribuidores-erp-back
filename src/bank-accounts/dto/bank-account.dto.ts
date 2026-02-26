@@ -17,11 +17,20 @@ export class CreateBankAccountDto {
 
   @IsString()
   @IsOptional()
-  accountNumber?: string;
+  account?: string; // 💡 Padronizado para bater com o Prisma schema
 
   @IsNumber()
   @IsOptional()
   initialBalance?: number;
+
+  // 👇 Novos campos adicionados
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
+
+  @IsString()
+  @IsOptional()
+  pixKey?: string;
 
   @IsBoolean()
   @IsOptional()
@@ -44,6 +53,15 @@ export class UpdateBankAccountDto {
   @IsNumber()
   @IsOptional()
   initialBalance?: number;
+
+  // 👇 Novos campos adicionados
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
+
+  @IsString()
+  @IsOptional()
+  pixKey?: string;
 
   @IsBoolean()
   @IsOptional()
