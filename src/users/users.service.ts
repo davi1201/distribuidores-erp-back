@@ -98,6 +98,7 @@ export class UsersService {
       personType: billingProfile?.personType,
       billingEmail: billingProfile?.email,
       billingPhone: billingProfile?.phone,
+      birthDate: billingProfile?.birthDate,
       zipCode: billingProfile?.zipCode,
       street: billingProfile?.street,
       number: billingProfile?.number,

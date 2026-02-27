@@ -392,19 +392,23 @@ export class StockService {
       },
     });
 
-    this.notificationsService.send({
+    // 👇 AJUSTADO PARA O PUSHER: Notifica os administradores sobre o pedido
+    this.notificationsService.notifyTenant(
       tenantId,
-      type: 'stock', // <--- Tipo correto para ícone de caixa/estoque
-      title: 'Solicitação de Transferência',
-      message: `O vendedor ${transfer.requester.name} está solicitando ajuste de estoque De ${transfer.origin.name} para ${transfer.destination.name}`,
-      link: `/registrations/stock?transferId=${transfer.id}`, // Link para a tela de transferências
-      actionLabel: 'Analisar',
-      metadata: {
-        id: transfer.id,
-        originId: transfer.originId,
+      'new-notification',
+      {
+        type: 'stock', // Tipo correto para ícone de caixa/estoque no Front
+        title: 'Solicitação de Transferência',
+        message: `O vendedor ${transfer.requester.name} está solicitando ajuste de estoque De ${transfer.origin.name} para ${transfer.destination.name}`,
+        link: `${process.env.URL_CALLBACK_TRANSFER_STOCK}?transferId=${transfer.id}`,
+        actionLabel: 'Analisar',
+        metadata: {
+          id: transfer.id,
+          originId: transfer.originId,
+        },
       },
-      targetRoles: ['ADMIN', 'OWNER'],
-    });
+      ['ADMIN', 'OWNER'], // targetRoles
+    );
 
     return transfer;
   }
@@ -498,7 +502,7 @@ export class StockService {
             productId: item.productId,
             fromWarehouseId: transfer.originId, // Saiu daqui
             type: 'EXIT',
-            reason: `Transferência #${transfer.code} (Em Trânsito)`,
+            reason: `Transferência #${(transfer as any).code || transfer.id} (Em Trânsito)`,
             quantity: item.quantity,
             userId,
             balanceAfter: Number(stockOrigin.quantity) - Number(item.quantity),
@@ -506,19 +510,24 @@ export class StockService {
         });
       }
 
-      this.notificationsService.send({
-        tenantId: transfer.tenantId,
-        type: 'stock',
-        title: 'Pedido de Transferência Aprovado',
-        message: `O seu pedido #${transfer.code} de transferência de estoque foi aprovado por ${approver?.name || 'Administrador'}`,
-        link: `/registrations/stock`,
-        actionLabel: 'Analisar',
-        metadata: {
-          id: transfer.id,
-          originId: transfer.originId,
+      // 👇 AJUSTADO PARA O PUSHER: Notifica apenas o vendedor que solicitou
+      this.notificationsService.notifyTenant(
+        transfer.tenantId,
+        'new-notification',
+        {
+          type: 'stock',
+          title: 'Pedido de Transferência Aprovado',
+          message: `O seu pedido de transferência de estoque foi aprovado por ${approver?.name || 'Administrador'}`,
+          link: process.env.URL_CALLBACK_TRANSFER_STOCK,
+          actionLabel: 'Analisar',
+          metadata: {
+            id: transfer.id,
+            originId: transfer.originId,
+          },
         },
-        targetRoles: ['SELLER'],
-      });
+        undefined, // targetRoles vazias, pois usaremos o targetUsers abaixo
+        [transfer.requesterId], // targetUsers: Manda a notificação DIRETO para o criador do pedido
+      );
 
       // Atualiza Status
       return tx.stockTransfer.update({
@@ -574,7 +583,7 @@ export class StockService {
             productId: item.productId,
             toWarehouseId: transfer.destinationId, // Entrou aqui
             type: 'ENTRY',
-            reason: `Recebimento Transferência #${transfer.code}`,
+            reason: `Recebimento Transferência #${(transfer as any).code || transfer.id}`,
             quantity: item.quantity,
             userId,
             balanceAfter: Number(stockDest.quantity),
@@ -605,27 +614,26 @@ export class StockService {
       where: { productId, warehouseId: warehouseId },
     });
 
-    return this.prisma.$transaction(
-      stockItems.map(
-        (item) =>
-          this.prisma.stockItem.update({
-            where: { id: item.id },
-            data: { quantity: quantity + Number(item.quantity) },
-          }),
-
-        this.prisma.stockMovement.create({
-          data: {
-            tenantId,
-            productId,
-            type: MovementType.ENTRY,
-            quantity,
-            reason: reason || 'Ajuste',
-            costPrice: 0,
-            balanceAfter: quantity,
-            userId,
-          },
+    // 👇 CORRIGIDO: O $transaction exige um array de promises. Antes estava passando os métodos separados por vírgula direto.
+    return this.prisma.$transaction([
+      ...stockItems.map((item) =>
+        this.prisma.stockItem.update({
+          where: { id: item.id },
+          data: { quantity: quantity + Number(item.quantity) },
         }),
       ),
-    );
+      this.prisma.stockMovement.create({
+        data: {
+          tenantId,
+          productId,
+          type: MovementType.ENTRY,
+          quantity,
+          reason: reason || 'Ajuste',
+          costPrice: 0,
+          balanceAfter: quantity,
+          userId,
+        },
+      }),
+    ]);
   }
 }

@@ -175,20 +175,26 @@ export class MailWatcherService {
 
       this.logger.log(`✅ NFe salva no Inbox! Chave: ${accessKey}`);
 
-      this.notificationsService.send({
-        tenantId,
-        type: 'nfe',
-        title: 'Nova Nota Fiscal',
-        message: `Recebida de ${sender}. Clique para importar.`,
-        link: `/nfe/inbox?open=${newNfe.id}`,
-        actionLabel: 'Ver Nota',
-        metadata: {
-          id: newNfe.id,
-          accessKey: newNfe.accessKey,
-          sender: newNfe.senderEmail,
-          receivedAt: newNfe.receivedAt,
+      // 👇 AQUI ESTÁ O AJUSTE PARA O NOVO NOTIFICATIONS SERVICE VIA PUSHER 👇
+      this.notificationsService.notifyTenant(
+        tenantId, // 1. ID do Tenant (O canal será 'tenant-{tenantId}')
+        'new-notification', // 2. Nome do Evento (O React precisa dar bind neste nome)
+        {
+          // 3. Payload (Os dados que vão chegar no Frontend)
+          type: 'nfe',
+          title: 'Nova Nota Fiscal',
+          message: `Recebida de ${sender}. Clique para importar.`,
+          link: `/nfe/inbox?open=${newNfe.id}`,
+          actionLabel: 'Ver Nota',
+          metadata: {
+            id: newNfe.id,
+            accessKey: newNfe.accessKey,
+            sender: newNfe.senderEmail,
+            receivedAt: newNfe.receivedAt,
+          },
         },
-      });
+        ['OWNER', 'ADMIN'], // 4. (Opcional) Array de Roles - Notifica apenas administradores/donos para não poluir os vendedores
+      );
     } catch (e) {
       this.logger.error('Falha ao processar XML anexo', e);
     }

@@ -39,6 +39,8 @@ import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
 import { AsaasService } from './asaas/asaas.service';
 import { AsaasModule } from './asaas/asaas.module';
 import { MailModule } from './mail/mail.module';
+import { SystemController } from './system/system.controller';
+import { SystemService } from './system/system.service';
 
 @Module({
   imports: [
@@ -73,7 +75,7 @@ import { MailModule } from './mail/mail.module';
     AsaasModule,
     MailModule,
   ],
-  controllers: [CommissionsController],
+  controllers: [CommissionsController, SystemController],
   providers: [
     AuditService,
     {
@@ -83,6 +85,7 @@ import { MailModule } from './mail/mail.module';
     LocationsService,
     StorageService,
     DashboardService,
+    SystemService,
   ],
 })
 export class AppModule {}
