@@ -2,7 +2,7 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
 import { MailService } from 'src/mail/mail.service';
-import { buildBoletoEmail } from 'src/mail/templates/boleto.template';
+import { buildBoletoEmail } from '../mail/templates/boleto.template';
 
 @Injectable()
 export class AsaasService {
