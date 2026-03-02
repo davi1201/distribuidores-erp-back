@@ -104,12 +104,7 @@ export class WebhooksService {
   private async linkUserToTenant(data: any) {
     const clerkUserId = data.public_user_data.user_id;
     const clerkOrgId = data.organization.id;
-    const clerkRole = data.role; // 'org:admin' (Dono) ou 'org:member' (Vendedor)
-
-    // 💡 A MÁGICA ACONTECE AQUI:
-    // Se ele criou a empresa, o Clerk manda 'org:admin' e ele continua OWNER.
-    // Se ele veio do link de convite, o Clerk manda 'org:member' e nós REBAIXAMOS ele para SELLER.
-    const appRole = clerkRole === 'org:admin' ? 'OWNER' : 'SELLER';
+    const clerkRole = data.role; // 'org:owner', 'org:admin', 'org:seller'
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { clerkId: clerkOrgId },
@@ -131,10 +126,26 @@ export class WebhooksService {
       );
     }
 
-    // Trava contra sequestro de Tenant (mantida por segurança)
+    // Trava contra sequestro de Tenant
     if (user.tenantId && user.tenantId !== tenant.id) {
       this.logger.warn(
         `🛡️ BLOQUEADO: Usuário ${user.email} já pertence à org ID [${user.tenantId}]. Ignorando evento.`,
+      );
+      return;
+    }
+
+    // ✅ Mapeamento direto e explícito — sem ambiguidade
+    const roleMap: Record<string, string> = {
+      'org:owner': 'OWNER',
+      'org:admin': 'ADMIN',
+      'org:seller': 'SELLER',
+    };
+
+    const appRole = roleMap[clerkRole];
+
+    if (!appRole) {
+      this.logger.warn(
+        `⚠️ Role desconhecido recebido do Clerk: "${clerkRole}". Usuário ${user.email} não foi vinculado.`,
       );
       return;
     }
@@ -143,7 +154,7 @@ export class WebhooksService {
       where: { id: user.id },
       data: {
         tenantId: tenant.id,
-        role: appRole as any, // Aplica a regra de negócio correta
+        role: appRole as any,
         isActive: true,
       },
     });
