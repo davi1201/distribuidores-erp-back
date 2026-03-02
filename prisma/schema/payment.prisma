@@ -49,23 +49,37 @@ model Invoice {
 model PaymentTerm {
   id          String  @id @default(uuid())
   tenantId    String
-  name        String // Ex: "Entrada + 30/60", "3x Boleto"
+  name        String // Ex: "30/60/90 dias"
   description String?
   type        String // 'PAYABLE', 'RECEIVABLE', 'BOTH'
   isActive    Boolean @default(true)
 
+  // --- MELHORIAS DE ERP ---
+
+  // Valor mínimo para esta condição ser liberada (Ex: 3x apenas acima de R$ 300)
+  minAmount Decimal @default(0) @db.Decimal(15, 2)
+
+  // Quantidade de parcelas que essa regra gera (facilita filtros e queries)
+  installmentsCount Int @default(1)
+
+  // Se true, permite que o vendedor altere as datas manualmente no ato da venda
   isFlexible Boolean @default(false)
 
-  // Armazena as regras como JSON stringfied
-  // Ex: '[{"days": 0, "percent": 33.33}, {"days": 30, "percent": 33.33}, {"days": 60, "percent": 33.34}]'
-  rules     String
+  // Estrutura: [{"days": 30, "percent": 50}, {"days": 60, "percent": 50}]
+  rules Json
+
+  // Relação N:N - Restringe quais métodos aceitam esta condição
+  // Se vazio, aceita todos. Se tiver "Boleto", essa condição só aparece se o Meio for Boleto.
+  allowedMethods TenantPaymentMethod[] @relation("TermToMethod")
+
   Tenant    Tenant   @relation(fields: [tenantId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  titles    FinancialTitle[]
-  movements FinancialMovement[]
-  orders    Order[]
+  titles       FinancialTitle[]
+  movements    FinancialMovement[]
+  orders       Order[]
+  OrderPayment OrderPayment[]
 
   @@map("payment_terms")
 }

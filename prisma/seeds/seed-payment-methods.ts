@@ -1,61 +1,74 @@
 import { PrismaClient } from '@prisma/client';
 
-export default async function seed(prisma: PrismaClient) {
-  console.log(
-    '💳 Iniciando seed de Métodos de Pagamento para TODOS os tenants...',
-  );
+const prisma = new PrismaClient();
 
-  // 1. Busca TODOS os tenants cadastrados
-  const tenants = await prisma.tenant.findMany();
+async function main() {
+  console.log('🌱 Iniciando o seed de Métodos de Pagamento do Sistema...');
 
-  if (tenants.length === 0) {
-    console.warn(
-      '   ⚠️ Nenhum tenant encontrado no banco de dados. Pulei esta etapa.',
-    );
-    return;
-  }
-
-  const methods = [
-    { name: 'Dinheiro', code: 'CASH' },
-    { name: 'Pix', code: 'PIX' },
-    { name: 'Boleto Bancário', code: 'BOLETO' },
-    { name: 'Cartão de Crédito', code: 'CREDIT_CARD' },
-    { name: 'Cartão de Débito', code: 'DEBIT_CARD' },
-    { name: 'Transferência Bancária', code: 'BANK_TRANSFER' },
-    { name: 'Cheque', code: 'CHECK' },
-    { name: 'Outro', code: 'OTHER' },
+  const paymentMethods = [
+    {
+      name: 'Pix',
+      code: 'PIX',
+      isAcquirer: false,
+    },
+    {
+      name: 'Dinheiro',
+      code: 'CASH',
+      isAcquirer: false,
+    },
+    {
+      name: 'Cartão de Crédito',
+      code: 'CREDIT_CARD',
+      // True porque ele habilita a tela para o Lojista cadastrar as taxas e parcelas (1x a 12x)
+      isAcquirer: true,
+    },
+    {
+      name: 'Cartão de Débito',
+      code: 'DEBIT_CARD',
+      isAcquirer: true, // Também tem taxa de maquininha (geralmente em 1x)
+    },
+    {
+      name: 'Cheque',
+      code: 'CHECK',
+      isAcquirer: false,
+    },
+    {
+      name: 'Boleto Bancário',
+      code: 'BOLETO',
+      isAcquirer: false,
+    },
+    {
+      name: 'Crediário / Carteira',
+      code: 'STORE_CREDIT',
+      isAcquirer: false, // Usado para as vendas "fiado" ou com as condições customizadas 30/60/90
+    },
   ];
 
-  console.log(`   Encontrados ${tenants.length} tenants. Processando...`);
-
-  // 2. Itera sobre cada tenant
-  for (const tenant of tenants) {
-    // console.log(`   -> Atualizando: ${tenant.name}`); // Descomente se quiser logs detalhados
-
-    // Estratégia Segura: Verifica um a um para evitar duplicatas
-    for (const method of methods) {
-      // Verificamos se já existe pelo CODE ou pelo NOME
-      const exists = await prisma.paymentMethod.findFirst({
-        where: {
-          tenantId: tenant.id,
-          OR: [{ code: method.code }, { name: method.name }],
-        },
-      });
-
-      if (!exists) {
-        await prisma.paymentMethod.create({
-          data: {
-            tenantId: tenant.id,
-            name: method.name,
-            code: method.code,
-            isActive: true,
-          },
-        });
-      }
-    }
+  for (const method of paymentMethods) {
+    // O upsert é perfeito aqui: ele tenta buscar pelo código.
+    // Se existir, não faz nada (update vazio). Se não existir, ele cria.
+    await prisma.systemPaymentMethod.upsert({
+      where: { code: method.code },
+      update: {
+        name: method.name,
+        isAcquirer: method.isAcquirer,
+      },
+      create: {
+        name: method.name,
+        code: method.code,
+        isAcquirer: method.isAcquirer,
+      },
+    });
   }
 
-  console.log(
-    '   ✅ Métodos de Pagamento verificados/criados para todos os tenants!',
-  );
+  console.log('✅ Seed de métodos de pagamento finalizado com sucesso!');
 }
+
+main()
+  .catch((e) => {
+    console.error('❌ Erro ao rodar o seed:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

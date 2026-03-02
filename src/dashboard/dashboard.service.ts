@@ -27,7 +27,6 @@ export class DashboardService {
       status: { not: 'CANCELED' },
     };
 
-    // Se for Vendedor, injeta o sellerId em TUDO que envolva pedidos
     if (role === 'SELLER') {
       orderBaseFilter.sellerId = userId;
     }
@@ -43,13 +42,13 @@ export class DashboardService {
       pendingTransfers,
       pendingCommissions,
     ] = await Promise.all([
-      // Vendas do Mês Atual (Blindado pelo orderBaseFilter)
+      // Vendas do Mês Atual (Ajustado para totalAmount)
       this.prisma.order.aggregate({
         where: { ...orderBaseFilter, createdAt: { gte: startCurrentMonth } },
         _sum: { total: true },
         _count: true,
       }),
-      // Vendas do Mês Anterior (Blindado pelo orderBaseFilter)
+      // Vendas do Mês Anterior (Ajustado para totalAmount)
       this.prisma.order.aggregate({
         where: {
           ...orderBaseFilter,
@@ -57,16 +56,16 @@ export class DashboardService {
         },
         _sum: { total: true },
       }),
-      // 👇 CORREÇÃO: Clientes Ativos (Agora o vendedor só vê os clientes da própria carteira)
+      // Clientes Ativos
       this.prisma.customer.count({
         where: {
           tenantId,
           isActive: true,
-          ...(role === 'SELLER' ? { sellerId: userId } : {}), // Nota: Confirme se a sua tabela Customer usa 'sellerId', 'userId' ou 'createdById'
+          ...(role === 'SELLER' ? { sellerId: userId } : {}),
         },
       }),
 
-      // Pedidos aguardando separação (Blindado)
+      // Pedidos aguardando separação
       this.prisma.order.count({
         where: {
           tenantId,
@@ -74,7 +73,7 @@ export class DashboardService {
           ...(role === 'SELLER' ? { sellerId: userId } : {}),
         },
       }),
-      // Transferências de estoque aguardando aprovação (Blindado)
+      // Transferências de estoque aguardando aprovação
       this.prisma.stockTransfer.count({
         where: {
           tenantId,
@@ -82,7 +81,7 @@ export class DashboardService {
           ...(role === 'SELLER' ? { requesterId: userId } : {}),
         },
       }),
-      // Comissões (Blindado pelo relacionamento com o pedido)
+      // Comissões
       this.prisma.commissionRecord.aggregate({
         where: {
           order: {
@@ -96,25 +95,33 @@ export class DashboardService {
     ]);
 
     // ========================================================================
-    // 2. RECEBIMENTOS POR MÉTODO DE PAGAMENTO
+    // 2. RECEBIMENTOS POR MÉTODO DE PAGAMENTO (Ajustado para o novo modelo)
     // ========================================================================
     const financialTitles = await this.prisma.financialTitle.findMany({
       where: {
         tenantId,
         type: 'RECEIVABLE',
         createdAt: { gte: startCurrentMonth },
-        // Garante que o vendedor só veja títulos financeiros gerados pelos SEUS pedidos
         ...(role === 'SELLER' ? { order: { sellerId: userId } } : {}),
       },
-      include: { paymentMethod: { select: { name: true } } },
+      include: {
+        tenantPaymentMethod: {
+          include: { systemPaymentMethod: true },
+        },
+      },
     });
 
     const paymentMethodsMap = new Map<string, number>();
     for (const title of financialTitles) {
-      const methodName = title.paymentMethod?.name || 'Não Informado';
+      // Pega o apelido customizado do Lojista (Ex: "Stone") ou o nome original do ERP (Ex: "Cartão de Crédito")
+      const methodName =
+        title.tenantPaymentMethod?.customName ||
+        title.tenantPaymentMethod?.systemPaymentMethod?.name ||
+        'Não Informado';
+
       paymentMethodsMap.set(
         methodName,
-        (paymentMethodsMap.get(methodName) || 0) + Number(title.balance), // Pode usar title.totalAmount dependendo da sua regra
+        (paymentMethodsMap.get(methodName) || 0) + Number(title.originalAmount), // Usando originalAmount que é o valor real da fatura
       );
     }
     const financialByMethod = Array.from(paymentMethodsMap.entries())
@@ -126,7 +133,6 @@ export class DashboardService {
     // ========================================================================
     const orderItems = await this.prisma.orderItem.findMany({
       where: {
-        // Blindado! O vendedor só verá os produtos mais vendidos nos SEUS próprios pedidos.
         order: {
           ...orderBaseFilter,
           createdAt: { gte: startCurrentMonth },
@@ -163,7 +169,6 @@ export class DashboardService {
     // ========================================================================
     const salesGraph = await this.getSalesGraphData({ tenantId, userId, role });
 
-    // Últimas Vendas (Blindado pelo orderBaseFilter)
     const recentSales = await this.prisma.order.findMany({
       where: orderBaseFilter,
       orderBy: { createdAt: 'desc' },
@@ -171,7 +176,7 @@ export class DashboardService {
       include: { customer: { select: { name: true } } },
     });
 
-    // Cálculos Finais
+    // Cálculos Finais (Ajustados para ler totalAmount)
     const currentTotal = Number(totalSalesMonth._sum.total || 0);
     const lastTotal = Number(totalSalesLastMonth._sum.total || 0);
     const growth =
@@ -196,8 +201,8 @@ export class DashboardService {
       salesChart: salesGraph,
       recentSales: recentSales.map((sale) => ({
         id: sale.id,
-        customer: sale.customer.name,
-        amount: Number(sale.total),
+        customer: sale.customer?.name || 'Cliente Avulso',
+        amount: Number(sale.total), // Ajustado para totalAmount
         status: sale.status,
         date: sale.createdAt,
       })),
@@ -212,16 +217,16 @@ export class DashboardService {
     const currentDate = new Date();
     const startDate = subMonths(currentDate, 5);
 
-    // SQL Nativo blindado para a consulta do Gráfico
     const userFilter =
       role === 'SELLER' ? Prisma.sql`AND "sellerId" = ${userId}` : Prisma.empty;
 
+    // 🔥 CORREÇÃO DO SQL NATIVO: Agora soma a coluna "totalAmount" e não "total"
     const salesByMonth = await this.prisma.$queryRaw<
       Array<{ month_date: Date; total_sales: number }>
     >`
     SELECT 
       DATE_TRUNC('month', "createdAt") as month_date, 
-      SUM(total) as total_sales
+      SUM("total") as total_sales
     FROM "orders"
     WHERE "tenantId" = ${tenantId}
       AND "createdAt" >= ${startDate}

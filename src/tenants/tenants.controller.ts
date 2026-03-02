@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { Role, type User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TenantsService } from './tenants.service';
@@ -41,5 +49,20 @@ export class TenantsController {
   @Roles(Role.OWNER, Role.ADMIN)
   async testConnection(@CurrentUser() user: any) {
     return this.tenantsService.testEmailConnection(user.tenantId);
+  }
+
+  @Post('payment-method-config/:systemMethodId')
+  async saveConfig(
+    @CurrentUser() user: any,
+    @Param('systemMethodId') systemMethodId: string,
+    @Body() dto: any, // No futuro, crie um DTO para validar esses campos
+  ) {
+    const tenantId = user.tenantId;
+
+    return this.tenantsService.savePaymentMethodConfig(
+      tenantId,
+      systemMethodId,
+      dto,
+    );
   }
 }

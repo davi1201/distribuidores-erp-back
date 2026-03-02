@@ -11,10 +11,6 @@ export class WebhooksService {
   async processClerkEvent(eventType: string, data: any) {
     this.logger.log(`📥 Processando evento Clerk: ${eventType}`);
 
-    // NOTA: Não usamos try/catch global aqui!
-    // Se ocorrer um erro (ex: usuário não encontrado), queremos que a exceção suba
-    // para o Controller retornar 500, forçando o Clerk a fazer o RETRY automático.
-
     switch (eventType) {
       case 'user.created':
       case 'user.updated':
@@ -31,7 +27,7 @@ export class WebhooksService {
         break;
 
       case 'organizationMembership.created':
-      case 'organizationMembership.updated': // Importante caso mude o cargo no painel do Clerk
+      case 'organizationMembership.updated':
         await this.linkUserToTenant(data);
         break;
 
@@ -68,15 +64,18 @@ export class WebhooksService {
           name,
           avatarUrl: image,
           password: '',
-          role: 'SELLER', // 💡 PADRÃO SEGURO: Nasce como seller. Será atualizado no membership.
+          // 🔥 CORREÇÃO: Todo novo cadastro direto nasce como dono de uma futura empresa
+          role: 'OWNER',
         },
       });
+      this.logger.log(`✅ Usuário Base criado como OWNER: ${email}`);
     }
   }
 
   private async deleteUser(clerkId: string) {
     this.logger.warn(`🗑️ Soft delete para user Clerk ${clerkId}`);
-    // await this.prisma.user.update({ where: { clerkId }, data: { isActive: false } });
+    // Opcional: Desativar o usuário no seu banco
+    // await this.prisma.user.updateMany({ where: { clerkId }, data: { isActive: false } });
   }
 
   private async syncTenant(data: any) {
@@ -87,7 +86,8 @@ export class WebhooksService {
       );
     }
 
-    const tenant = await this.prisma.tenant.upsert({
+    // O upsert é seguro contra duplo-disparo do mesmo ID de organização
+    await this.prisma.tenant.upsert({
       where: { clerkId: data.id },
       update: { name: data.name, slug: data.slug },
       create: {
@@ -99,25 +99,22 @@ export class WebhooksService {
         planId: defaultPlan.id,
       },
     });
-
-    // 💡 OTIMIZAÇÃO: Não precisamos vincular o usuário aqui.
-    // O evento 'organizationMembership.created' do criador vai chegar logo em seguida e fará isso perfeitamente.
   }
 
   private async linkUserToTenant(data: any) {
     const clerkUserId = data.public_user_data.user_id;
     const clerkOrgId = data.organization.id;
-    const clerkRole = data.role; // Padrão do Clerk: 'org:admin' ou 'org:member'
+    const clerkRole = data.role; // 'org:admin' (Dono) ou 'org:member' (Vendedor)
 
-    // 💡 REGRA DE NEGÓCIO CLARA
+    // 💡 A MÁGICA ACONTECE AQUI:
+    // Se ele criou a empresa, o Clerk manda 'org:admin' e ele continua OWNER.
+    // Se ele veio do link de convite, o Clerk manda 'org:member' e nós REBAIXAMOS ele para SELLER.
     const appRole = clerkRole === 'org:admin' ? 'OWNER' : 'SELLER';
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { clerkId: clerkOrgId },
     });
 
-    // 💡 SEGREDO DO RETRY: Se não achar, estoure um erro!
-    // O Clerk vai receber o erro e tentar mandar esse webhook de novo em 5 minutos.
     if (!tenant) {
       throw new Error(
         `[RETRY] Tenant ${clerkOrgId} não existe ainda. Aguardando syncTenant.`,
@@ -134,32 +131,54 @@ export class WebhooksService {
       );
     }
 
-    // Aplica o papel (OWNER ou SELLER) e o vínculo na mesma operação
+    // Trava contra sequestro de Tenant (mantida por segurança)
+    if (user.tenantId && user.tenantId !== tenant.id) {
+      this.logger.warn(
+        `🛡️ BLOQUEADO: Usuário ${user.email} já pertence à org ID [${user.tenantId}]. Ignorando evento.`,
+      );
+      return;
+    }
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         tenantId: tenant.id,
-        role: appRole as any,
+        role: appRole as any, // Aplica a regra de negócio correta
         isActive: true,
       },
     });
 
     this.logger.log(
-      `✅ Vínculo realizado: User ${user.email} -> Org ${tenant.name} como ${appRole}`,
+      `✅ Vínculo realizado: User ${user.email} -> Org ${tenant.name} com cargo final: ${appRole}`,
     );
   }
 
   private async unlinkUserFromTenant(data: any) {
     const clerkUserId = data.public_user_data.user_id;
+    const clerkOrgId = data.organization.id;
 
     const user = await this.prisma.user.findUnique({
       where: { clerkId: clerkUserId },
     });
-    if (!user) return; // Se o usuário não existe, não há o que desvincular
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { tenantId: null, role: 'SELLER' }, // Tira da org e rebaixa permissões por segurança
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { clerkId: clerkOrgId },
     });
+
+    if (!user || !tenant) return;
+
+    if (user.tenantId === tenant.id) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { tenantId: null, role: 'SELLER' },
+      });
+      this.logger.log(
+        `✅ Desvínculo realizado: Usuário ${user.email} removido da Org ${tenant.name}`,
+      );
+    } else {
+      this.logger.warn(
+        `🛡️ IGNORADO: O usuário ${user.email} não pertence à Org ${tenant.name}, portanto o unlink foi ignorado.`,
+      );
+    }
   }
 }

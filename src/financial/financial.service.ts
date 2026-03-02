@@ -13,7 +13,7 @@ import {
   MovementType,
   TitleStatus,
 } from '@prisma/client';
-import { addDays } from 'date-fns';
+import { addDays, addMonths } from 'date-fns';
 import { CreateTitleDto } from './dto/create-title.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
 
@@ -39,34 +39,93 @@ export interface GenerateTitlesConfig {
   customerId?: string;
   supplierId?: string;
   orderId?: string;
+  orderPaymentId?: string;
   importId?: string;
   paymentTermId?: string;
   installmentsPlan?: InstallmentRule[];
+  installmentCount?: number;
   startDate?: Date | string;
-  paymentMethodId?: string;
+  tenantPaymentMethodId?: string;
   categoryId?: string;
+  tx?: Prisma.TransactionClient; // 🔥 Opcional para não quebrar chamadas avulsas
 }
 
 @Injectable()
 export class FinancialService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createTitle(dto: CreateTitleDto, tenantId: string, userId: string) {
+  // ==========================================================================
+  // CALCULADORA DE PDV
+  // ==========================================================================
+  async calculateSaleTotal(
+    tenantId: string,
+    tenantPaymentMethodId: string,
+    baseTotal: number,
+    installmentCount: number = 1,
+  ) {
+    const method = await this.prisma.tenantPaymentMethod.findUnique({
+      where: { id: tenantPaymentMethodId },
+      include: {
+        systemPaymentMethod: true,
+        installments: {
+          where: { installment: installmentCount },
+        },
+      },
+    });
+
+    if (!method || method.tenantId !== tenantId) {
+      throw new NotFoundException('Método de pagamento não encontrado.');
+    }
+
+    let finalTotal = baseTotal;
+    let discountValue = 0;
+
+    if (Number(method.discountPercentage) > 0) {
+      discountValue = baseTotal * (Number(method.discountPercentage) / 100);
+      finalTotal = baseTotal - discountValue;
+    }
+
+    let feeValue = 0;
+    if (
+      method.systemPaymentMethod.isAcquirer &&
+      method.passFeeToCustomer &&
+      method.installments.length > 0
+    ) {
+      const feePercentage = Number(method.installments[0].feePercentage);
+      const divisor = (100 - feePercentage) / 100;
+      const totalWithFee = divisor > 0 ? finalTotal / divisor : finalTotal;
+      feeValue = totalWithFee - finalTotal;
+      finalTotal = totalWithFee;
+    }
+
+    return {
+      originalTotal: baseTotal,
+      finalTotal: Math.round(finalTotal * 100) / 100,
+      discountApplied: Math.round(discountValue * 100) / 100,
+      feeValue: Math.round(feeValue * 100) / 100,
+      installmentValue: Math.round((finalTotal / installmentCount) * 100) / 100,
+    };
+  }
+
+  // ==========================================================================
+  // GERAÇÃO DE TÍTULOS (Controller / Manual)
+  // ==========================================================================
+  async createTitle(
+    dto: CreateTitleDto & { tenantPaymentMethodId?: string },
+    tenantId: string,
+    userId: string,
+  ) {
     this.validateTitleCreation(dto);
 
     const typeEnum =
       dto.type === 'PAYABLE' ? TitleType.PAYABLE : TitleType.RECEIVABLE;
-
     const titleNumber =
       dto.titleNumber ||
       `${typeEnum === TitleType.PAYABLE ? 'P' : 'R'}-${Date.now()}`;
+    const paymentMethodId =
+      dto.tenantPaymentMethodId || (dto as any).paymentMethodId;
 
     if (dto.installments && dto.installments > 1) {
-      const plan = Array.from({ length: dto.installments }).map((_, i) => ({
-        days: i * 30,
-        percent: 100 / dto.installments,
-      }));
-
       await this.generateTitlesFromCondition({
         tenantId,
         userId,
@@ -77,54 +136,50 @@ export class FinancialService {
         customerId: dto.customerId,
         supplierId: dto.supplierId,
         categoryId: dto.categoryId,
-        paymentMethodId: dto.paymentMethodId,
-        installmentsPlan: plan,
+        tenantPaymentMethodId: paymentMethodId,
+        installmentCount: dto.installments,
         startDate: new Date(dto.dueDate),
       });
       return { success: true, message: 'Parcelas geradas' };
     }
 
-    return this.prisma.financialTitle.create({
-      data: {
-        tenantId,
-        type: typeEnum,
-        origin: TitleOrigin.MANUAL,
-        status: TitleStatus.OPEN,
-        titleNumber,
-        description: dto.description,
-        originalAmount: Number(dto.amount),
-        balance: Number(dto.amount),
-        dueDate: new Date(dto.dueDate),
-        installmentNumber: 1,
-        totalInstallments: 1,
-        customerId: dto.customerId,
-        supplierId: dto.supplierId,
-        orderId: dto.orderId,
-        importId: dto.importId,
-        categoryId: dto.categoryId,
-        paymentMethodId: dto.paymentMethodId,
-        createdById: userId,
-      },
+    await this.generateTitlesFromCondition({
+      tenantId,
+      userId,
+      type: typeEnum,
+      totalAmount: dto.amount,
+      docNumber: titleNumber,
+      descriptionPrefix: dto.description,
+      customerId: dto.customerId,
+      supplierId: dto.supplierId,
+      categoryId: dto.categoryId,
+      tenantPaymentMethodId: paymentMethodId,
+      installmentsPlan: [{ days: 0, percent: 100 }],
+      installmentCount: 1,
+      startDate: new Date(dto.dueDate),
     });
+
+    return { success: true, message: 'Título gerado' };
   }
 
   async generateTitlesFromCondition(config: GenerateTitlesConfig) {
-    const { tenantId, type, customerId, supplierId } = config;
+    const { tenantId, type, customerId, tx } = config;
+    const prisma = tx || this.prisma;
 
-    if (type === TitleType.RECEIVABLE && !customerId)
+    if (type === TitleType.RECEIVABLE && !customerId) {
       throw new BadRequestException(
         'Cliente obrigatório para contas a receber.',
       );
-    if (type === TitleType.PAYABLE && !supplierId)
-      throw new BadRequestException(
-        'Fornecedor obrigatório para contas a pagar.',
-      );
+    }
 
-    const plan = await this.resolveInstallmentPlan(tenantId, config);
+    const { plan, finalTotalAmount } =
+      await this.resolveInstallmentPlanAndAmount(tenantId, config);
+    config.totalAmount = finalTotalAmount;
+
     const titlesData = this.calculateInstallmentsData(plan, config);
 
     if (titlesData.length > 0) {
-      await this.prisma.financialTitle.createMany({ data: titlesData });
+      await prisma.financialTitle.createMany({ data: titlesData });
     }
   }
 
@@ -145,17 +200,172 @@ export class FinancialService {
       paymentTermId: config.paymentTermId,
       installmentsPlan: config.installmentsPlan,
       startDate: config.firstDueDate || config.startDate,
-      paymentMethodId: config.paymentMethodId,
+      tenantPaymentMethodId: config.tenantPaymentMethodId,
     });
   }
 
-  async registerMovement(
-    dto: RegisterPaymentDto | RegisterPaymentDto[], // Aceita um ou vários
+  // ==========================================================================
+  // LÓGICA DE RESOLUÇÃO DE PARCELAS
+  // ==========================================================================
+  private async resolveInstallmentPlanAndAmount(
     tenantId: string,
-    user: User,
+    config: GenerateTitlesConfig,
+  ): Promise<{ plan: InstallmentRule[]; finalTotalAmount: number }> {
+    const {
+      tenantPaymentMethodId,
+      paymentTermId,
+      installmentsPlan,
+      totalAmount,
+      tx,
+    } = config;
+    const prisma = tx || this.prisma;
+
+    let plan: InstallmentRule[] = installmentsPlan || [];
+    let finalTotalAmount = totalAmount;
+
+    if (tenantPaymentMethodId) {
+      const method = await prisma.tenantPaymentMethod.findUnique({
+        where: { id: tenantPaymentMethodId },
+        include: {
+          systemPaymentMethod: true,
+          installments: { orderBy: { installment: 'asc' } },
+        },
+      });
+
+      if (method && method.systemPaymentMethod.isAcquirer) {
+        const instCount = config.installmentCount || 1;
+        const configParcela = method.installments.find(
+          (i) => i.installment === instCount,
+        );
+
+        const newPlan: InstallmentRule[] = [];
+        if (method.isAnticipated) {
+          newPlan.push({
+            days: configParcela?.receiveInDays || 1,
+            percent: 100,
+          });
+        } else {
+          for (let i = 1; i <= instCount; i++) {
+            const current = method.installments.find(
+              (inst) => inst.installment === i,
+            );
+            newPlan.push({
+              days: (current?.receiveInDays || 30) * i,
+              percent: 100 / instCount,
+            });
+          }
+        }
+        return { plan: newPlan, finalTotalAmount };
+      }
+    }
+
+    if (plan.length === 0 && paymentTermId) {
+      const term = await prisma.paymentTerm.findUnique({
+        where: { id: paymentTermId },
+      });
+
+      if (term) {
+        const dbRules = term.rules as any;
+        if (Array.isArray(dbRules) && dbRules.length > 0) {
+          plan = dbRules.map((r: any) => ({
+            days: Number(r.days),
+            percent: Number(r.percent),
+            fixedAmount: r.fixedAmount ? Number(r.fixedAmount) : undefined,
+          }));
+        }
+      }
+    }
+
+    if (plan.length === 0) plan = [{ days: 0, percent: 100 }];
+    return { plan, finalTotalAmount };
+  }
+
+  private calculateInstallmentsData(
+    plan: InstallmentRule[],
+    config: GenerateTitlesConfig,
+  ) {
+    const {
+      totalAmount,
+      startDate,
+      docNumber,
+      tenantId,
+      userId,
+      type,
+      customerId,
+      supplierId,
+      orderId,
+      orderPaymentId,
+      tenantPaymentMethodId,
+      descriptionPrefix,
+      paymentTermId,
+    } = config;
+
+    const baseDate = startDate ? new Date(startDate) : new Date();
+    const formattedDocNumber = generateDocNumber(docNumber);
+    const titlesToCreate: Prisma.FinancialTitleCreateManyInput[] = [];
+    let remainingBalance = totalAmount;
+
+    for (let i = 0; i < plan.length; i++) {
+      const rule = plan[i];
+      const isLast = i === plan.length - 1;
+
+      let amount = rule.fixedAmount
+        ? Number(rule.fixedAmount)
+        : Number(
+            ((totalAmount * (rule.percent || 100 / plan.length)) / 100).toFixed(
+              2,
+            ),
+          );
+
+      if (isLast) amount = Number(remainingBalance.toFixed(2));
+      remainingBalance -= amount;
+
+      if (amount <= 0 && remainingBalance <= 0 && plan.length > 1) continue;
+
+      let dueDate: Date;
+      if (rule.days === 0) {
+        dueDate = baseDate;
+      } else if (rule.days % 30 === 0) {
+        dueDate = addMonths(baseDate, rule.days / 30);
+      } else {
+        dueDate = addDays(baseDate, rule.days);
+      }
+
+      const parcelLabel = `${i + 1}`;
+      titlesToCreate.push({
+        tenantId,
+        type,
+        origin: orderId ? TitleOrigin.ORDER : TitleOrigin.MANUAL,
+        status: TitleStatus.OPEN,
+        titleNumber: `${formattedDocNumber}/${parcelLabel}`,
+        description: `${descriptionPrefix} - Parc ${parcelLabel}/${plan.length}`,
+        installmentNumber: i + 1,
+        totalInstallments: plan.length,
+        originalAmount: amount,
+        balance: amount,
+        dueDate,
+        customerId,
+        supplierId,
+        orderId,
+        orderPaymentId,
+        tenantPaymentMethodId: tenantPaymentMethodId || null,
+        paymentTermId: paymentTermId || null,
+        createdById: userId,
+      });
+    }
+
+    return titlesToCreate;
+  }
+
+  // ==========================================================================
+  // BAIXA DE TÍTULOS (registerMovement)
+  // ==========================================================================
+  async registerMovement(
+    dto: RegisterPaymentDto | RegisterPaymentDto[],
+    tenantId: string,
+    user: any,
   ) {
     const payments = Array.isArray(dto) ? dto : [dto];
-
     const movementsCreated: any[] = [];
     let totalRemainingMoney = 0;
 
@@ -176,34 +386,31 @@ export class FinancialService {
           Number(payment.amount),
           tx,
         );
-
         let remainingMoney = Number(payment.amount);
 
         for (const title of titlesToProcess) {
           if (remainingMoney <= 0) break;
-
           const currentBalance = Number(title.balance);
           const amountToPay = Math.min(currentBalance, remainingMoney);
-
           if (amountToPay <= 0) continue;
-
-          const movementType =
-            title.type === TitleType.RECEIVABLE
-              ? MovementType.RECEIPT
-              : MovementType.PAYMENT;
 
           const movement = await tx.financialMovement.create({
             data: {
               tenantId,
               titleId: title.id,
               bankAccountId: payment.bankAccountId,
-              type: movementType,
+              type:
+                title.type === TitleType.RECEIVABLE
+                  ? MovementType.RECEIPT
+                  : MovementType.PAYMENT,
               amount: amountToPay,
               paymentDate: payment.paymentDate
                 ? new Date(payment.paymentDate)
                 : new Date(),
               userId: user.id,
-              paymentMethodId: payment.paymentMethodId,
+              tenantPaymentMethodId:
+                (payment as any).tenantPaymentMethodId ||
+                (payment as any).paymentMethodId,
               observation:
                 title.id === initialTitle.id
                   ? payment.observation
@@ -212,8 +419,8 @@ export class FinancialService {
           });
 
           movementsCreated.push(movement);
-
           const newBalance = currentBalance - amountToPay;
+
           await tx.financialTitle.update({
             where: { id: title.id },
             data: {
@@ -222,7 +429,6 @@ export class FinancialService {
                 newBalance <= 0.01 ? TitleStatus.PAID : TitleStatus.PARTIAL,
             },
           });
-
           remainingMoney -= amountToPay;
         }
 
@@ -245,213 +451,27 @@ export class FinancialService {
       success: true,
       processedTitles: movementsCreated.length,
       creditGenerated: totalRemainingMoney,
-      message: Array.isArray(dto)
-        ? 'Baixa em lote processada com sucesso!'
-        : 'Baixa processada com sucesso!',
     };
   }
 
-  async findAll(tenantId: string, user: any, filters: any) {
-    const where: Prisma.FinancialTitleWhereInput = { tenantId };
-
-    if (filters.type) where.type = filters.type;
-    if (filters.status) where.status = filters.status;
-    if (filters.customerId) where.customerId = filters.customerId;
-    if (filters.supplierId) where.supplierId = filters.supplierId;
-
-    if (filters.startDate || filters.endDate) {
-      where.dueDate = {};
-      if (filters.startDate) where.dueDate.gte = new Date(filters.startDate);
-      if (filters.endDate) where.dueDate.lte = new Date(filters.endDate);
-    }
-
-    if (user.role === 'SELLER') {
-      where.type = TitleType.RECEIVABLE;
-      where.customer = { sellerId: user.userId };
-    }
-
-    return this.prisma.financialTitle.findMany({
-      where,
-      include: {
-        customer: { select: { name: true } },
-        supplier: { select: { name: true } },
-        category: { select: { name: true } },
-        createdBy: { select: { name: true } },
-        paymentMethod: { select: { name: true, code: true } },
-        paymentTerm: { select: { name: true } },
-      },
-      orderBy: { dueDate: 'asc' },
-    });
-  }
-
-  async findAllPaymentMethods(tenantId: string) {
-    return this.prisma.paymentMethod.findMany({
-      where: { tenantId, isActive: true },
-      orderBy: { name: 'asc' },
-    });
-  }
-
+  // ==========================================================================
+  // HELPERS RESTAURADOS
+  // ==========================================================================
   private validateTitleCreation(dto: CreateTitleDto) {
-    if (dto.type === 'RECEIVABLE' && !dto.customerId) {
+    if (dto.type === 'RECEIVABLE' && !dto.customerId)
       throw new BadRequestException('Contas a receber exigem um Cliente.');
-    }
-    if (dto.type === 'PAYABLE' && !dto.supplierId && !dto.description) {
+    if (dto.type === 'PAYABLE' && !dto.supplierId && !dto.description)
       throw new BadRequestException(
         'Contas a pagar exigem Fornecedor ou Descrição.',
       );
-    }
-  }
-
-  private async resolveInstallmentPlan(
-    tenantId: string,
-    config: GenerateTitlesConfig,
-  ): Promise<InstallmentRule[]> {
-    const { paymentTermId, installmentsPlan } = config;
-    let plan: InstallmentRule[] = installmentsPlan || [];
-
-    if (plan.length > 0) {
-      return plan;
-    }
-
-    if (paymentTermId) {
-      const term = await this.prisma.paymentTerm.findUnique({
-        where: { id: paymentTermId, tenantId },
-      });
-
-      if (term) {
-        try {
-          let dbRules: string | InstallmentRule[] = term['rules'];
-
-          if (typeof dbRules === 'string') {
-            try {
-              dbRules = JSON.parse(dbRules);
-            } catch (parseError) {
-              console.error(
-                'Erro ao fazer parse do JSON de regras:',
-                parseError,
-              );
-              dbRules = [];
-            }
-          }
-
-          const isFlexible = term['isFlexible'];
-
-          if (!isFlexible || plan.length === 0) {
-            if (Array.isArray(dbRules) && dbRules.length > 0) {
-              plan = dbRules.map((r: any) => ({
-                days: Number(r.days),
-                percent: Number(r.percent),
-                fixedAmount: r.fixedAmount ? Number(r.fixedAmount) : undefined,
-              }));
-            }
-          }
-        } catch (e) {
-          console.error(`Erro regras termo ${paymentTermId}`, e);
-        }
-      }
-    }
-
-    if (plan.length === 0) {
-      plan = [{ days: 0, percent: 100 }];
-    }
-
-    return plan;
-  }
-
-  private calculateInstallmentsData(
-    plan: InstallmentRule[],
-    config: GenerateTitlesConfig,
-  ) {
-    const {
-      totalAmount,
-      startDate,
-      docNumber,
-      tenantId,
-      userId,
-      type,
-      customerId,
-      supplierId,
-      orderId,
-      importId,
-      paymentMethodId,
-      descriptionPrefix,
-      paymentTermId,
-    } = config;
-
-    const baseDate = startDate ? new Date(startDate) : new Date();
-    const safeImportId = importId ? String(importId) : null;
-
-    let origin: TitleOrigin = TitleOrigin.MANUAL;
-    if (orderId) origin = TitleOrigin.ORDER;
-    else if (importId) origin = TitleOrigin.IMPORT;
-
-    const titlesToCreate: Prisma.FinancialTitleCreateManyInput[] = [];
-    let remainingBalance = totalAmount;
-
-    const formattedDocNumber = generateDocNumber(docNumber);
-
-    for (let i = 0; i < plan.length; i++) {
-      const rule = plan[i];
-      const isLast = i === plan.length - 1;
-      let amount = 0;
-
-      if (rule.fixedAmount) {
-        amount = Number(rule.fixedAmount);
-      } else {
-        const pct = rule.percent || 100 / plan.length;
-        amount = Number(((totalAmount * pct) / 100).toFixed(2));
-      }
-
-      if (isLast) {
-        amount = Number(remainingBalance.toFixed(2));
-      }
-
-      remainingBalance -= amount;
-
-      if (amount <= 0 && remainingBalance <= 0 && plan.length > 1) continue;
-
-      const dueDate = addDays(baseDate, rule.days);
-      const parcelLabel = `${i + 1}`;
-
-      const description = `${descriptionPrefix} - Parc ${parcelLabel}/${plan.length}`;
-
-      titlesToCreate.push({
-        tenantId,
-        type,
-        origin,
-        status: TitleStatus.OPEN,
-
-        titleNumber: `${formattedDocNumber}/${parcelLabel}`,
-        description,
-
-        installmentNumber: i + 1,
-        totalInstallments: plan.length,
-
-        originalAmount: amount,
-        balance: amount,
-        dueDate,
-
-        customerId,
-        supplierId,
-        orderId,
-        importId: safeImportId,
-
-        paymentMethodId: paymentMethodId || null,
-        paymentTermId: paymentTermId || null,
-
-        createdById: userId,
-      });
-    }
-
-    return titlesToCreate;
   }
 
   private async resolveTitlesToProcess(
     initialTitle: FinancialTitle,
     amountPaid: number,
-    tx?: Prisma.TransactionClient, // <-- NOVO: Aceita a transação opcional
+    tx?: Prisma.TransactionClient,
   ) {
-    const dbClient = tx || this.prisma; // Usa a transação se existir, senão usa o Prisma normal
+    const dbClient = tx || this.prisma;
     const titles = [initialTitle];
 
     if (
@@ -471,7 +491,6 @@ export class FinancialService {
       });
       titles.push(...nextTitles);
     }
-
     return titles;
   }
 
@@ -482,7 +501,6 @@ export class FinancialService {
     userId: string,
   ) {
     if (!originTitle.customerId) return;
-
     await tx.financialTitle.create({
       data: {
         tenantId: originTitle.tenantId,
@@ -492,10 +510,8 @@ export class FinancialService {
         titleNumber: `CRED-${originTitle.titleNumber}`,
         description: `Crédito gerado do pagto ${originTitle.titleNumber}`,
         customerId: originTitle.customerId,
-
         installmentNumber: 1,
         totalInstallments: 1,
-
         originalAmount: amount,
         balance: amount,
         dueDate: new Date(),
@@ -506,14 +522,39 @@ export class FinancialService {
 
   async reconcileMovements(movementIds: string[], tenantId: string) {
     return this.prisma.financialMovement.updateMany({
-      where: {
-        id: { in: movementIds },
-        tenantId,
+      where: { id: { in: movementIds }, tenantId },
+      data: { reconciled: true, reconciledAt: new Date() },
+    });
+  }
+
+  async findAll(tenantId: string, user: any, filters: any) {
+    const where: Prisma.FinancialTitleWhereInput = { tenantId };
+    if (filters.type) where.type = filters.type;
+    if (filters.status) where.status = filters.status;
+    if (filters.customerId) where.customerId = filters.customerId;
+
+    return this.prisma.financialTitle.findMany({
+      where,
+      include: {
+        customer: { select: { name: true } },
+        category: { select: { name: true } },
+        tenantPaymentMethod: {
+          select: {
+            customName: true,
+            systemPaymentMethod: { select: { name: true } },
+          },
+        },
+        paymentTerm: { select: { name: true } },
       },
-      data: {
-        reconciled: true,
-        reconciledAt: new Date(),
-      },
+      orderBy: { dueDate: 'asc' },
+    });
+  }
+
+  async findAllPaymentMethods(tenantId: string) {
+    return this.prisma.tenantPaymentMethod.findMany({
+      where: { tenantId, isActive: true },
+      include: { systemPaymentMethod: true },
+      orderBy: { customName: 'asc' },
     });
   }
 }

@@ -50,6 +50,7 @@ model Order {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   commissionRecord CommissionRecord?
+  payments         OrderPayment[]
 
   @@map("orders")
 }
@@ -64,7 +65,6 @@ model OrderItem {
 
   quantity Decimal @db.Decimal(10, 4)
 
-  // SNAPSHOTS (Valores congelados no momento da venda)
   unitPrice  Decimal @db.Decimal(10, 2) // Preço unitário vindo da Tabela
   discount   Decimal @default(0) @db.Decimal(10, 2)
   totalPrice Decimal @db.Decimal(10, 2) // (Unit * Qty) - Discount
@@ -74,7 +74,45 @@ model OrderItem {
   // Impostos do Item (Calculados pelo TaxProfile na hora da venda)
   icmsRate Decimal @default(0) @db.Decimal(5, 2)
   ipiRate  Decimal @default(0) @db.Decimal(5, 2)
-  // ... outros impostos
 
   @@map("order_items")
+}
+
+model OrderPayment {
+  id String @id @default(uuid())
+
+  // Segurança Multi-tenant
+  tenantId String
+
+  // Vínculo com o Pedido
+  orderId String
+
+  // Vínculo com a Forma de Pagamento escolhida pelo Lojista (Ex: "Cartão Stone")
+  tenantPaymentMethodId String
+
+  // --- Valores Base ---
+  baseAmount   Decimal @db.Decimal(10, 2) // O valor bruto que o cliente quis passar aqui (Ex: R$ 800)
+  installments Int     @default(1) // Em quantas vezes ele dividiu (Ex: 3)
+
+  // --- Congelamento Financeiro (Imutabilidade) ---
+  // Salva exatamente o que aconteceu no momento da venda, caso o dono mude a taxa da maquininha no futuro
+  discountApplied Decimal @default(0) @db.Decimal(10, 2) // Ex: R$ 20 de desconto no Pix
+  feeApplied      Decimal @default(0) @db.Decimal(10, 2) // Ex: R$ 42,10 de repasse de juros do cartão
+  finalAmount     Decimal @db.Decimal(10, 2) // O valor líquido/final dessa fatia (Ex: R$ 842,10)
+
+  // --- Relacionamentos ---
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  order               Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenantPaymentMethod TenantPaymentMethod @relation(fields: [tenantPaymentMethodId], references: [id])
+
+  paymentTermId String?
+  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
+
+  // 🔗 A mágica do financeiro: 1 pagamento de cartão em 3x vai gerar 3 FinancialTitles aqui dentro
+  titles FinancialTitle[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("order_payments")
 }

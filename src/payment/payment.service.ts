@@ -524,8 +524,7 @@ export class PaymentService {
   }
 
   private getFrontendUrl(): string {
-    const url =
-      this.configService.get<string>('FRONTEND_URL') || 'http://localhost:3005';
+    const url = process.env.FRONTEND_URL || 'http://localhost:3005';
     return url.replace(/\/$/, '');
   }
 

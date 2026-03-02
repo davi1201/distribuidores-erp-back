@@ -74,16 +74,16 @@ export class TenantSetupService {
       });
 
       // C. Cria Métodos de Pagamento
-      if (this.DEFAULT_PAYMENT_METHODS.length > 0) {
-        await tx.paymentMethod.createMany({
-          data: this.DEFAULT_PAYMENT_METHODS.map((pm) => ({
-            tenantId: tenant.id,
-            name: pm.name,
-            code: pm.code,
-            isActive: true,
-          })),
-        });
-      }
+      // if (this.DEFAULT_PAYMENT_METHODS.length > 0) {
+      //   await tx.paymentMethod.createMany({
+      //     data: this.DEFAULT_PAYMENT_METHODS.map((pm) => ({
+      //       tenantId: tenant.id,
+      //       name: pm.name,
+      //       code: pm.code,
+      //       isActive: true,
+      //     })),
+      //   });
+      // }
 
       // D. (Opcional) Cria Categorias Financeiras
       // await tx.financialCategory.createMany(...)

@@ -43,4 +43,6 @@ export class CreatePaymentTermDto {
 
   @IsBoolean()
   isFlexible: boolean;
+  minAmount: number;
+  methodIds: any;
 }

@@ -66,15 +66,10 @@ export class ProductsService {
       // 2. Cria as Variantes reutilizando lógica centralizada
       const createdProducts: any[] = [];
       for (const variant of variants) {
-        // const finalName = parentData
-        //   ? `${parentData.name} ${variant.name}`
-        //   : variant.name;
-
         // Prepara dados mesclando pai e filho
         const productData = {
           ...variant,
           name: variant.name,
-          // variantName: parentData ? variant.name : null,
           brand: parentData?.brand || variant.brand,
           description: parentData?.description || variant.description,
           ncm: parentData?.ncm || variant.ncm,
@@ -160,19 +155,13 @@ export class ProductsService {
       }
 
       const updatedProducts: any[] = [];
-
-      // --- CORREÇÃO AQUI ---
       const existingVariantIds = new Set(
         existingParent.variants.map((v) => v.id),
       );
-      // Adiciona o próprio Pai na lista de IDs válidos para Update
       existingVariantIds.add(parentId);
-      // ---------------------
 
       for (const variant of variants) {
         const variantId = (variant as any).id;
-
-        // Agora isso vai retornar TRUE para o ID do pai
         const isUpdate = variantId && existingVariantIds.has(variantId);
 
         const finalName = parentData
@@ -194,7 +183,6 @@ export class ProductsService {
         };
 
         if (isUpdate) {
-          // UPDATE (Vai cair aqui agora)
           const product = await this.updateSingleProductInternal(
             tx,
             variantId,
@@ -205,7 +193,6 @@ export class ProductsService {
           );
           updatedProducts.push(product);
         } else {
-          // CREATE (Nova variante)
           const product = await this.createSingleProductInternal(
             tx,
             { ...productData, parentId },
@@ -231,7 +218,6 @@ export class ProductsService {
     tenantId: string,
     user: any,
   ) {
-    // Garante que existe antes de abrir transação
     await this.findOne(id, tenantId);
 
     return this.prisma.$transaction(async (tx) => {
@@ -247,19 +233,50 @@ export class ProductsService {
     });
   }
 
+  // 🔥 AJUSTADO: Soft Delete em Cascata e Liberação de SKU
   async remove(id: string, tenantId: string) {
-    await this.findOne(id, tenantId);
-    return this.prisma.product.delete({ where: { id } });
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      include: { variants: true }, // Trazemos as variantes para apagar em cascata
+    });
+
+    if (!product || product.tenantId !== tenantId) {
+      throw new NotFoundException('Produto não encontrado');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const deletedSuffix = `-deleted-${Date.now()}`;
+
+      // 1. Soft Delete no Produto Principal
+      const deletedProduct = await tx.product.update({
+        where: { id },
+        data: {
+          isActive: false,
+          sku: `${product.sku}${deletedSuffix}`, // Libera o SKU
+        },
+      });
+
+      // 2. Se for um Produto Pai, aplica Soft Delete nas Variações também
+      if (product.variants && product.variants.length > 0) {
+        for (const variant of product.variants) {
+          await tx.product.update({
+            where: { id: variant.id },
+            data: {
+              isActive: false,
+              sku: `${variant.sku}${deletedSuffix}`, // Libera o SKU da variação
+            },
+          });
+        }
+      }
+
+      return deletedProduct;
+    });
   }
 
   // ===========================================================================
   // PRIVATE HELPERS (CORE LOGIC)
   // ===========================================================================
 
-  /**
-   * Centraliza a criação de um único produto/variante
-   * (Usado pelo create simples e pelo loop do createBatch)
-   */
   private async createSingleProductInternal(
     tx: any,
     data: any,
@@ -269,7 +286,6 @@ export class ProductsService {
   ) {
     const sku = await this.ensureUniqueSku(tx, data.sku, tenantId);
 
-    // 1. Cria registro na tabela products
     const product = await tx.product.create({
       data: {
         tenantId,
@@ -292,7 +308,6 @@ export class ProductsService {
       },
     });
 
-    // 2. Manipuladores de sub-recursos
     await this.handleImages(tx, product.id, data.images);
 
     await this.handleStock(
@@ -326,9 +341,6 @@ export class ProductsService {
     return product;
   }
 
-  /**
-   * Centraliza a atualização de um único produto/variante
-   */
   private async updateSingleProductInternal(
     tx: any,
     productId: string,
@@ -337,7 +349,6 @@ export class ProductsService {
     user: any,
     defaultWarehouseId: string,
   ) {
-    // 1. Atualiza dados básicos
     const updateData: any = {
       name: data.name,
       variantName: data.variantName,
@@ -355,7 +366,6 @@ export class ProductsService {
     };
 
     if (data.sku) {
-      // Se mudou SKU, verifica unicidade (opcional, dependendo da regra de negócio)
       updateData.sku = data.sku.toUpperCase();
     }
 
@@ -364,10 +374,8 @@ export class ProductsService {
       data: updateData,
     });
 
-    // 2. Manipuladores de sub-recursos
     if (data.images) await this.handleImages(tx, productId, data.images);
 
-    // Nota: Update geralmente só altera config de estoque (min/max), não lança movimento
     if (data.stock)
       await this.handleStock(
         tx,
@@ -407,8 +415,6 @@ export class ProductsService {
   private async handleImages(tx: any, productId: string, images: any[]) {
     if (!images) return;
 
-    // Estratégia simples: remove todos e recria (idempotente)
-    // Se quiser otimizar no futuro, faça diff
     await tx.productImage.deleteMany({ where: { productId } });
 
     if (images.length > 0) {
@@ -432,13 +438,12 @@ export class ProductsService {
     costPrice: any,
     isCreation: boolean,
   ) {
-    if (!stockData && !isCreation) return; // Se é update e não veio stock, ignora
+    if (!stockData && !isCreation) return;
 
     const targetWarehouseId = stockData?.warehouseId || defaultWarehouseId;
     const initialQty = Number(stockData?.quantity || 0);
 
     if (isCreation) {
-      // Cria stock item
       await tx.stockItem.create({
         data: {
           productId,
@@ -449,7 +454,6 @@ export class ProductsService {
         },
       });
 
-      // Lança movimento inicial se houver qtd
       if (initialQty > 0) {
         await tx.stockMovement.create({
           data: {
@@ -466,7 +470,6 @@ export class ProductsService {
         });
       }
     } else {
-      // Update: apenas atualiza min/max ou cria se não existir (sem movimentar estoque)
       const existingStock = await tx.stockItem.findUnique({
         where: {
           productId_warehouseId: { productId, warehouseId: targetWarehouseId },
@@ -486,7 +489,7 @@ export class ProductsService {
           data: {
             productId,
             warehouseId: targetWarehouseId,
-            quantity: 0, // Update não adiciona saldo magicamente
+            quantity: 0,
             minStock: Number(stockData.minStock || 0),
             maxStock: Number(stockData.maxStock || 0),
           },
@@ -508,7 +511,6 @@ export class ProductsService {
     for (const p of prices) {
       const newPriceVal = Number(p.price);
 
-      // Busca preço atual para logar histórico corretamente
       const currentPriceObj = await tx.productPrice.findUnique({
         where: {
           productId_priceListId: { productId, priceListId: p.priceListId },
@@ -553,7 +555,6 @@ export class ProductsService {
     supplierData: any,
     defaultCost: number,
   ) {
-    // Se veio null explicitamente no update, deleta. Se undefined, ignora.
     if (supplierData === null) {
       await tx.productSupplier.deleteMany({ where: { productId } });
       return;
@@ -592,13 +593,14 @@ export class ProductsService {
     const skuExists = await tx.product.findUnique({
       where: {
         tenantId_sku: {
-          tenantId: tenantId, // Você precisa ter o tenantId disponível nessa função
-          sku: sku.toUpperCase(), // ou a variável que contém o SKU
+          tenantId: tenantId,
+          sku: sku.toUpperCase(),
         },
       },
     });
 
-    if (skuExists && skuExists.tenantId === tenantId) {
+    // Ignora conflitos com SKUs que já foram apagados (Soft Delete)
+    if (skuExists && skuExists.tenantId === tenantId && skuExists.isActive) {
       throw new BadRequestException(`SKU ${sku} já existente neste tenant.`);
     }
     return sku;
@@ -622,12 +624,14 @@ export class ProductsService {
   }
 
   // ===========================================================================
-  // READ METHODS (FIND/CALCULATE) - Mantidos inalterados na lógica
+  // READ METHODS (FIND/CALCULATE)
   // ===========================================================================
 
   async findOne(id: string, tenantId: string) {
     const product = await this.prisma.product.findUnique({
       where: { id },
+      // 🔥 MANTIDO SEM isActive AQUI: Assim o histórico de vendas antigas consegue
+      // resgatar os dados do produto mesmo que ele tenha sido deletado.
       include: {
         images: { orderBy: { order: 'asc' } },
         stock: { include: { warehouse: true } },
@@ -663,7 +667,11 @@ export class ProductsService {
 
   async findAll(tenantId: string, user: { role: string }) {
     const products = await this.prisma.product.findMany({
-      where: { tenantId, variants: { none: {} } },
+      where: {
+        tenantId,
+        parentId: null, // 🔥 CORREÇÃO: Pega os Produtos Pais ou Produtos Simples
+        isActive: true, // 🔥 NOVO: Ignora os deletados
+      },
       include: {
         stock: { include: { warehouse: true } },
         images: { orderBy: { order: 'asc' }, take: 1 },
@@ -671,6 +679,7 @@ export class ProductsService {
         parent: { select: { name: true } },
         supplier: { include: { supplier: true } },
         variants: {
+          where: { isActive: true }, // 🔥 NOVO: Ignora variantes deletadas individualmente
           include: {
             stock: true,
             prices: { include: { priceList: true } },
@@ -683,31 +692,25 @@ export class ProductsService {
     });
 
     return products.map((p) => {
-      // 1. Define a regra de visualização no início do map
       const canViewCost = user.role !== 'SELLER';
 
-      // --- AJUSTE SOLICITADO: Cálculo de Estoque Híbrido ---
       let totalStock = 0;
 
       if (p.variants.length > 0) {
-        // Cenário 1: Tem variantes -> Soma o estoque de todas as variações
         totalStock = p.variants.reduce(
           (accV, v) =>
             accV + v.stock.reduce((accS, s) => accS + Number(s.quantity), 0),
           0,
         );
       } else {
-        // Cenário 2: Produto Simples -> Soma o próprio estoque
         totalStock = p.stock.reduce((accS, s) => accS + Number(s.quantity), 0);
       }
-      // -----------------------------------------------------
 
       const supplierInfo = p.supplier
         ? {
             id: p.supplier.supplierId,
             name: p.supplier.supplier.name,
             productCode: p.supplier.supplierProductCode,
-            // 2. Oculta custo no contrato do fornecedor
             contractCost: canViewCost ? Number(p.supplier.lastPrice) : 0,
           }
         : p.variants[0]?.supplier?.supplier;
@@ -736,7 +739,6 @@ export class ProductsService {
           })),
         },
         financial: {
-          // 3. Oculta custo base
           baseCost: canViewCost ? Number(p.costPrice) : 0,
           markup: Number(p.markup),
         },
@@ -753,7 +755,6 @@ export class ProductsService {
             listId: pr.priceListId,
             listName: pr.priceList.name,
             price: Number(pr.price),
-            // 4. Oculta custo nas variações
             priceCost: canViewCost ? Number(v.costPrice) : 0,
             adjustment: Number(pr.priceList.percentageAdjustment || 0),
           })),
@@ -765,19 +766,15 @@ export class ProductsService {
   }
 
   async findSellable(tenantId: string, user: any) {
-    // 1. Identifica os depósitos: Do Vendedor e da Matriz (Default)
     let sellerWarehouseId: string | null = null;
     let defaultWarehouseId: string | null = null;
 
-    // Busca ID da Matriz
     const matrix = await this.prisma.warehouse.findFirst({
       where: { tenantId, isDefault: true },
       select: { id: true },
     });
     defaultWarehouseId = matrix?.id ?? null;
 
-    // Se for SELLER, busca o depósito dele usando o id do usuário atual
-    // Ajuste o user.userId para user.id caso o token do AuthGuard use 'id'
     const currentUserId = user.id || user.userId;
 
     if (user.role === 'SELLER') {
@@ -792,6 +789,7 @@ export class ProductsService {
     }
 
     const products = await this.prisma.product.findMany({
+      // 🔥 NOVO: Garante que os apagados não aparecerão no PDV
       where: { tenantId, variants: { none: {} }, isActive: true },
       include: {
         stock: true,
@@ -804,7 +802,6 @@ export class ProductsService {
     });
 
     return products.map((product) => {
-      // Monta o nome completo
       const displayName = product.parent
         ? `${product.name || ''}`
         : product.name;
@@ -812,7 +809,6 @@ export class ProductsService {
       let totalStock = 0;
       let stockInMatrix = 0;
 
-      // 👇 CORREÇÃO: Busca o estoque da Matriz SEMPRE (independente do cargo ou do estoque do vendedor)
       if (defaultWarehouseId) {
         const matrixEntry = product.stock.find(
           (s) => s.warehouseId === defaultWarehouseId,
@@ -820,20 +816,16 @@ export class ProductsService {
         stockInMatrix = Number(matrixEntry?.quantity || 0);
       }
 
-      // 2. Lógica de Estoque do Vendedor vs Admin
       if (user.role === 'SELLER') {
         if (sellerWarehouseId) {
-          // Busca estoque no depósito do vendedor
           const sellerEntry = product.stock.find(
             (s) => s.warehouseId === sellerWarehouseId,
           );
           totalStock = Number(sellerEntry?.quantity || 0);
         } else {
-          // Se o vendedor não tem depósito/carro configurado, o estoque local dele é 0
           totalStock = 0;
         }
       } else {
-        // ADMIN/OUTROS: O "totalStock" é a soma de TODOS os depósitos da empresa
         totalStock = product.stock.reduce(
           (acc, s) => acc + Number(s.quantity),
           0,
@@ -845,8 +837,8 @@ export class ProductsService {
       return {
         ...product,
         name: displayName,
-        totalStock, // Vendedor vê o dele, Admin vê a soma global
-        matrixStock: stockInMatrix, // TODO MUNDO vê o estoque da matriz de forma independente
+        totalStock,
+        matrixStock: stockInMatrix,
         basePrice,
       };
     });

@@ -26,7 +26,7 @@ export class PaymentController {
 
   // 1. Criar Sessão de Checkout (Protegido)
   @Post('checkout')
-  @UseGuards(ClerkAuthGuard) // Use seu ClerkAuthGuard aqui
+  @UseGuards(ClerkAuthGuard)
   async createCheckoutSession(
     @CurrentUser() user: any,
     @Body() body: { planSlug: string; cycle: 'monthly' | 'yearly' },

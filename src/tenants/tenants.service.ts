@@ -214,4 +214,84 @@ export class TenantsService {
       };
     }
   }
+
+  // ========================================================================
+  // CONFIGURAÇÃO DE MÉTODOS DE PAGAMENTO (TENANT)
+  // ========================================================================
+
+  async savePaymentMethodConfig(
+    tenantId: string,
+    systemMethodId: string,
+    dto: any,
+  ) {
+    // 1. Validar se o método base realmente existe no sistema
+    const systemMethod = await this.prisma.systemPaymentMethod.findUnique({
+      where: { id: systemMethodId },
+    });
+
+    if (!systemMethod) {
+      throw new NotFoundException('Método de pagamento base não encontrado.');
+    }
+
+    // 2. Executar a gravação em uma transação para garantir consistência
+    return this.prisma.$transaction(async (tx) => {
+      // Upsert na configuração do Tenant
+      const tenantMethod = await tx.tenantPaymentMethod.upsert({
+        where: {
+          tenantId_systemPaymentMethodId: {
+            tenantId,
+            systemPaymentMethodId: systemMethodId, // 👈 Ajustado aqui
+          },
+        },
+        create: {
+          tenantId,
+          systemPaymentMethodId: systemMethodId, // 👈 E aqui
+          customName: dto.customName || systemMethod.name,
+          isActive: dto.isActive ?? false,
+          discountPercentage: dto.discountPercentage || 0,
+          maxInstallments: dto.maxInstallments || 1,
+          minInstallmentValue: dto.minInstallmentValue || 0,
+          passFeeToCustomer: dto.passFeeToCustomer ?? false,
+          isAnticipated: dto.isAnticipated ?? true,
+          isConfigured: true,
+        },
+        update: {
+          customName: dto.customName,
+          isActive: dto.isActive,
+          discountPercentage: dto.discountPercentage,
+          maxInstallments: dto.maxInstallments,
+          minInstallmentValue: dto.minInstallmentValue,
+          passFeeToCustomer: dto.passFeeToCustomer,
+          isAnticipated: dto.isAnticipated,
+          isConfigured: true,
+        },
+      });
+
+      // 3. Se for um método de maquininha (Cartão), processamos a grade de parcelas
+      if (
+        systemMethod.isAcquirer &&
+        dto.installments &&
+        Array.isArray(dto.installments)
+      ) {
+        // Removemos a grade antiga para evitar duplicidade ou lixo
+        await tx.tenantPaymentInstallment.deleteMany({
+          where: { tenantPaymentMethodId: tenantMethod.id },
+        });
+
+        // Inserimos a nova grade de taxas
+        if (dto.installments.length > 0) {
+          await tx.tenantPaymentInstallment.createMany({
+            data: dto.installments.map((inst: any) => ({
+              tenantPaymentMethodId: tenantMethod.id,
+              installment: inst.installment,
+              feePercentage: inst.feePercentage || 0,
+              receiveInDays: inst.receiveInDays || (dto.isAnticipated ? 1 : 30),
+            })),
+          });
+        }
+      }
+
+      return tenantMethod;
+    });
+  }
 }

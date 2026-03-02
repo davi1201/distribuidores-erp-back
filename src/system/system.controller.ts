@@ -19,4 +19,10 @@ export class SystemController {
       data: readinessStatus,
     };
   }
+
+  @Get('payment-methods')
+  async getBasePaymentMethods(@Req() req: any) {
+    const tenantId = req.user.tenantId;
+    return this.systemService.getBaseMethods(tenantId);
+  }
 }
