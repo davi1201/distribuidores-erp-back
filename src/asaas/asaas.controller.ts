@@ -8,6 +8,7 @@ import {
   HttpStatus,
   Get,
   Body,
+  Query,
 } from '@nestjs/common';
 import { AsaasService } from './asaas.service';
 import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
@@ -18,24 +19,6 @@ import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 export class AsaasController {
   constructor(private readonly asaasService: AsaasService) {}
 
-  // ========================================================================
-  // 1. ATIVAR CONTA DIGITAL (SUBCONTA ASAAS)
-  // ========================================================================
-  @Post('tenant/activate')
-  async activateAccount(@CurrentUser() user: any) {
-    if (user.role !== 'OWNER') {
-      throw new HttpException(
-        'Acesso negado. Apenas administradores (OWNER) podem ativar a conta digital.',
-        HttpStatus.FORBIDDEN,
-      );
-    }
-
-    return await this.asaasService.createSubaccount(user.tenantId);
-  }
-
-  // ========================================================================
-  // 2. EMITIR BOLETO (Para Títulos Existentes)
-  // ========================================================================
   @Post('emit-boleto/:titleId')
   async emitBoleto(
     @Param('titleId') titleId: string,
@@ -76,5 +59,13 @@ export class AsaasController {
     }
 
     return await this.asaasService.requestTransfer(user.tenantId, transferData);
+  }
+
+  @Post('qrcode')
+  async getPixQrCode(@CurrentUser() user: any, @Body('amount') amount: number) {
+    return await this.asaasService.generatePixIntentForPDV(
+      user.tenantId,
+      amount,
+    );
   }
 }

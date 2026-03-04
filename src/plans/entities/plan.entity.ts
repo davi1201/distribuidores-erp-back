@@ -9,6 +9,8 @@ export class PlanEntity implements Plan {
   @ApiProperty({
     example: 'prod_ABC123XYZ',
     description: 'ID do produto no Stripe',
+    required: false,
+    nullable: true,
   })
   stripeProductId: string | null;
 
@@ -45,18 +47,37 @@ export class PlanEntity implements Plan {
   })
   stripeYearlyPriceId: string | null;
 
+  // 👇 NOVOS CAMPOS DO ASAAS
+  @ApiProperty({
+    description: 'ID do plano mensal no Asaas',
+    required: false,
+    nullable: true,
+  })
+  asaasMonthlyPlanId: string | null;
+
+  @ApiProperty({
+    description: 'ID do plano anual no Asaas',
+    required: false,
+    nullable: true,
+  })
+  asaasYearlyPlanId: string | null;
+
   @ApiProperty()
   isActive: boolean;
 
   @ApiProperty({ required: false })
   features: any; // JSON
 
-  // --- CORREÇÃO: Campo adicionado para satisfazer a interface Plan ---
   @ApiProperty({
     example: 5,
     description: 'Limite de usuários permitidos no plano',
   })
   maxUsers: number;
+
+  @ApiProperty({
+    example: 100,
+    description: 'Limite de boletos permitidos no plano',
+  })
   maxBoletos: number;
 
   @ApiProperty()

@@ -10,11 +10,15 @@ model Plan {
   stripeMonthlyPriceId String?
   stripeYearlyPriceId  String?
 
+  // 👇 NOVOS CAMPOS PARA O ASAAS (Opcionais, úteis se você cadastrar os planos lá)
+  asaasMonthlyPlanId String?
+  asaasYearlyPlanId  String?
+
   isActive Boolean @default(true)
   features Json?
 
   maxUsers   Int @default(1)
-  maxBoletos Int @default(0) // 👈 NOVO: O limite que vem do Stripe
+  maxBoletos Int @default(0)
 
   description String?
 

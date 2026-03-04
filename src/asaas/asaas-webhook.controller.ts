@@ -5,30 +5,72 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Logger,
 } from '@nestjs/common';
-import { AsaasService } from './asaas.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Controller('webhooks/asaas')
 export class AsaasWebhookController {
-  constructor(private readonly asaasService: AsaasService) {}
+  private readonly logger = new Logger(AsaasWebhookController.name);
 
-  // 💡 O Asaas sempre envia POST para o Webhook
+  constructor(
+    private eventEmitter: EventEmitter2,
+    private prisma: PrismaService,
+  ) {}
+
   @Post()
-  @HttpCode(HttpStatus.OK) // 💡 O Asaas exige que você responda com 200 OK rapidamente
+  @HttpCode(HttpStatus.OK)
   async handleWebhook(
     @Body() payload: any,
     @Headers('asaas-access-token') webhookToken: string,
   ) {
-    // 🛡️ SEGURANÇA: Opcional, mas muito recomendado.
+    // 1. LOG IMEDIATO: Se o Asaas bater aqui, o console VAI gritar.
+    this.logger.log(
+      `🕵️ Webhook recebido direto do Asaas! Evento: ${payload.event}`,
+    );
 
-    if (webhookToken !== process.env.ASAAS_WEBHOOK_SECRET) {
-      return { error: 'Token inválido' };
+    const { event } = payload;
+
+    // O Asaas manda o ID da cobrança em payment.id, ou o ID da carteira em account.id
+    const externalId = payload.payment?.id || payload.account?.id;
+
+    // 2. SALVA NA CAIXA DE ENTRADA (Segurança total contra perda de dados)
+    const webhookLog = await this.prisma.webhookEvent.create({
+      data: {
+        provider: 'ASAAS',
+        eventType: event || 'UNKNOWN',
+        payload: payload,
+        externalId: externalId || null,
+        status: 'PENDING',
+      },
+    });
+
+    // Embutimos o ID do log no payload caso algum serviço precise atualizar algo específico
+    payload.webhookLogId = webhookLog.id;
+
+    // 3. TENTA PROCESSAR OS EVENTOS
+    try {
+      await this.eventEmitter.emitAsync(`asaas.${event}`, payload);
+
+      // Se todos os listeners (@OnEvent) terminarem sem erro, marca como sucesso
+      await this.prisma.webhookEvent.update({
+        where: { id: webhookLog.id },
+        data: { status: 'PROCESSED', processedAt: new Date() },
+      });
+    } catch (error) {
+      this.logger.error(
+        `❌ Falha ao processar Webhook ${webhookLog.id}: ${error.message}`,
+      );
+
+      // Se der erro no seu código (ex: variável nula), salva o erro no banco para você ver depois
+      await this.prisma.webhookEvent.update({
+        where: { id: webhookLog.id },
+        data: { status: 'FAILED', errorMessage: error.stack || error.message },
+      });
     }
 
-    // Envia o payload para o Service processar em background
-    await this.asaasService.processWebhook(payload);
-
-    // Responde pro Asaas: "Recebido, obrigado!"
+    // Retorna 200 OK para o Asaas dar o serviço como entregue
     return { received: true };
   }
 }

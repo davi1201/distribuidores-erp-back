@@ -47,6 +47,7 @@ export interface GenerateTitlesConfig {
   startDate?: Date | string;
   tenantPaymentMethodId?: string;
   categoryId?: string;
+  status?: TitleStatus;
   tx?: Prisma.TransactionClient; // 🔥 Opcional para não quebrar chamadas avulsas
 }
 
@@ -298,6 +299,7 @@ export class FinancialService {
       tenantPaymentMethodId,
       descriptionPrefix,
       paymentTermId,
+      status = TitleStatus.OPEN,
     } = config;
 
     const baseDate = startDate ? new Date(startDate) : new Date();
@@ -336,7 +338,7 @@ export class FinancialService {
         tenantId,
         type,
         origin: orderId ? TitleOrigin.ORDER : TitleOrigin.MANUAL,
-        status: TitleStatus.OPEN,
+        status: status,
         titleNumber: `${formattedDocNumber}/${parcelLabel}`,
         description: `${descriptionPrefix} - Parc ${parcelLabel}/${plan.length}`,
         installmentNumber: i + 1,

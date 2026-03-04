@@ -41,6 +41,7 @@ import { AsaasModule } from './asaas/asaas.module';
 import { MailModule } from './mail/mail.module';
 import { SystemController } from './system/system.controller';
 import { SystemService } from './system/system.service';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { SystemService } from './system/system.service';
     BankAccountsModule,
     AsaasModule,
     MailModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [CommissionsController, SystemController],
   providers: [

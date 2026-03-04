@@ -102,18 +102,27 @@ export class WebhooksService {
   }
 
   private async linkUserToTenant(data: any) {
-    const clerkUserId = data.public_user_data.user_id;
-    const clerkOrgId = data.organization.id;
-    const clerkRole = data.role; // 'org:owner', 'org:admin', 'org:seller'
+    const clerkUserId =
+      data.public_user_data?.user_id || data.public_user_data?.id;
+    const clerkOrgId = data.organization?.id;
+    const clerkRole = data.role; // Ex: 'org:owner', 'org:admin', 'org:member', 'org:seller'
+
+    if (!clerkUserId || !clerkOrgId) {
+      this.logger.warn(
+        `⚠️ Dados inválidos no evento de membership. Ignorando.`,
+      );
+      return;
+    }
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { clerkId: clerkOrgId },
     });
 
     if (!tenant) {
-      throw new Error(
+      this.logger.warn(
         `[RETRY] Tenant ${clerkOrgId} não existe ainda. Aguardando syncTenant.`,
       );
+      throw new Error(`Tenant não encontrado`);
     }
 
     const user = await this.prisma.user.findUnique({
@@ -121,9 +130,10 @@ export class WebhooksService {
     });
 
     if (!user) {
-      throw new Error(
+      this.logger.warn(
         `[RETRY] User ${clerkUserId} não existe ainda. Aguardando syncUser.`,
       );
+      throw new Error(`Usuário não encontrado`);
     }
 
     // Trava contra sequestro de Tenant
@@ -134,20 +144,20 @@ export class WebhooksService {
       return;
     }
 
-    // ✅ Mapeamento direto e explícito — sem ambiguidade
-    const roleMap: Record<string, string> = {
-      'org:owner': 'OWNER',
-      'org:admin': 'ADMIN',
-      'org:seller': 'SELLER',
-    };
+    // 🔥 REGRA FORTE: Definindo a Role
+    let appRole = 'SELLER'; // O padrão para convidados será sempre SELLER
 
-    const appRole = roleMap[clerkRole];
-
-    if (!appRole) {
-      this.logger.warn(
-        `⚠️ Role desconhecido recebido do Clerk: "${clerkRole}". Usuário ${user.email} não foi vinculado.`,
-      );
-      return;
+    // Se o Clerk explicitly disser que é admin/owner, OU se o nosso banco já souber que ele é o dono (criador original)
+    if (
+      clerkRole === 'org:owner' ||
+      clerkRole === 'org:admin' ||
+      user.role === 'OWNER'
+    ) {
+      appRole = 'OWNER';
+    }
+    // Mapeamento extra para administradores não-donos, se você tiver
+    else if (clerkRole === 'org:sys_admin') {
+      appRole = 'ADMIN';
     }
 
     await this.prisma.user.update({

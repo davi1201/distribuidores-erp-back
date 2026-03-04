@@ -47,10 +47,28 @@ export class BillingGuard implements CanActivate {
     const now = new Date();
     const latestSub = tenant.subscriptions[0];
 
+    const isTrialActive =
+      tenant.isActive && tenant.trialEndsAt && tenant.trialEndsAt > now;
+    const urlActivate = request.url === '/api/v1/asaas/onboarding/activate';
+
     // --- CHECK 1: TRIAL DO SISTEMA (Interno) ---
     // Se você deu 7 dias de graça via banco de dados (sem pedir cartão no Stripe ainda)
-    if (tenant.isActive && tenant.trialEndsAt && tenant.trialEndsAt > now) {
+    if (isTrialActive && urlActivate === false) {
       return true;
+    }
+
+    if (
+      urlActivate &&
+      (latestSub.id === undefined || latestSub.status === 'CANCELED')
+    ) {
+      throw new ForbiddenException({
+        message: 'Ative sua conta para acessar esta funcionalidade.',
+        code: 'TRIAL_ACTIVE',
+        details: {
+          trialEndsAt: tenant.trialEndsAt,
+        },
+        action: 'REDIRECT_TO_ONBOARDING',
+      });
     }
 
     // --- CHECK 2: ASSINATURA STRIPE ---

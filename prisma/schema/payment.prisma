@@ -10,14 +10,19 @@ enum SubscriptionStatus {
 model Subscription {
   id String @id @default(uuid())
 
-  externalId String @unique // ID da assinatura na Stripe (sub_...)
-  customerId String // ID do cliente na Stripe (cus_...)
+  // ID da assinatura (Stripe: sub_... | Asaas: sub_... ou installment_...)
+  externalId String @unique
+  // ID do cliente no gateway (Stripe: cus_... | Asaas: cus_...)
+  customerId String
   status     String // active, past_due, canceled
+
+  // 👇 NOVO: Identifica qual gateway processou essa assinatura
+  gateway String @default("STRIPE") // "STRIPE" ou "ASAAS"
 
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
 
-  tenantId String // Removido @unique para permitir histórico (1:N)
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
 
   planId String

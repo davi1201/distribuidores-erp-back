@@ -14,8 +14,12 @@ model Tenant {
   subscriptions  Subscription[]
 
   // --- Integração Financeira (Asaas) ---
-  asaasApiKey   String? // A chave exclusiva deste Tenant (Subconta)
-  asaasWalletId String? // ID da carteira dele no Asaas
+  asaasAccountId     String? // 🔥 ADICIONE ESTE CAMPO
+  asaasApiKey        String? // A chave exclusiva deste Tenant (Subconta)
+  asaasWalletId      String? // ID da carteira dele no Asaas
+  asaasPixKey        String? // Adicione este campo para guardar a chave gerada  
+  asaasOnboardingUrl String? // URL temporária para o lojista completar o onboarding (subir docs, etc). Expira em 24h.
+  asaasAccountStatus String  @default("PENDING") // PENDING, AWAITING_APPROVAL, APPROVED, REJECTED
 
   // =====================================================================
   // CONTROLE DE LIMITES (Arquitetura Dois Baldes)

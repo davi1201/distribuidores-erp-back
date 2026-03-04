@@ -25,6 +25,11 @@ model BillingProfile {
   tenantId String @unique
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  asaasCustomerId      String? @unique
+  asaasCreditCardToken String? // O token alfanumérico seguro
+  asaasCardLast4       String? // Ex: "1234" (Para mostrar no Front-end)
+  asaasCardBrand       String? // Ex: "MASTERCARD", "VISA"
+
   updatedAt DateTime @updatedAt
 
   @@map("billing_profiles")
