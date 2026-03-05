@@ -62,10 +62,15 @@ export class AsaasController {
   }
 
   @Post('qrcode')
-  async getPixQrCode(@CurrentUser() user: any, @Body('amount') amount: number) {
+  async getPixQrCode(
+    @CurrentUser() user: any,
+    @Body('amount') amount: number,
+    @Body('customerId') customerId: string,
+  ) {
     return await this.asaasService.generatePixIntentForPDV(
       user.tenantId,
       amount,
+      customerId,
     );
   }
 
