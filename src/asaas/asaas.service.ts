@@ -237,6 +237,47 @@ export class AsaasService {
     }
   }
 
+  // ==========================================================================
+  // EXTRATO FINANCEIRO (Financial Transactions)
+  // ==========================================================================
+
+  async getFinancialStatement(
+    tenantId: string,
+    filters: {
+      startDate?: string;
+      endDate?: string;
+      offset?: number;
+      limit?: number;
+    },
+  ) {
+    const tenant = await this.getTenantOrThrow(tenantId);
+
+    try {
+      // Constrói a query string com os filtros opcionais
+      const queryParams = new URLSearchParams();
+
+      if (filters.startDate) queryParams.append('startDate', filters.startDate);
+      if (filters.endDate) queryParams.append('endDate', filters.endDate);
+      if (filters.offset)
+        queryParams.append('offset', filters.offset.toString());
+
+      // Define um limite padrão de 20 itens por página se não for informado
+      queryParams.append('limit', (filters.limit || 20).toString());
+
+      const { data } = await axios.get(
+        `${this.baseURL}/financialTransactions?${queryParams.toString()}`,
+        {
+          headers: { access_token: tenant.asaasApiKey },
+        },
+      );
+
+      // O Asaas retorna: { object: "list", hasMore: boolean, totalCount: number, data: [...] }
+      return data;
+    } catch (error) {
+      this.handleAsaasError(error);
+    }
+  }
+
   async requestTransfer(tenantId: string, transferData: any) {
     const tenant = await this.getTenantOrThrow(tenantId);
     try {
@@ -244,15 +285,17 @@ export class AsaasService {
         `${this.baseURL}/transfers`,
         {
           value: transferData.value,
-          bankAccount: {
-            bank: { code: transferData.bankCode },
-            ...transferData,
-          },
           operationType: 'PIX',
+          pixAddressKey: transferData.pixAddressKey,
+          pixAddressKeyType: transferData.pixAddressKeyType,
         },
         { headers: { access_token: tenant.asaasApiKey } },
       );
-      return { success: true, transferId: data.id };
+      return {
+        success: true,
+        transferId: data.id,
+        message: 'Transferência solicitada com sucesso.',
+      };
     } catch (error) {
       this.handleAsaasError(error);
     }

@@ -14,6 +14,7 @@ export class BankAccountsService {
       data: {
         ...dto,
         tenantId,
+        pixKeyType: dto.pixKeyType as any,
       },
     });
   }
@@ -49,7 +50,10 @@ export class BankAccountsService {
 
     return this.prisma.bankAccount.update({
       where: { id },
-      data: dto,
+      data: {
+        ...dto,
+        pixKeyType: dto.pixKeyType as any,
+      },
     });
   }
 

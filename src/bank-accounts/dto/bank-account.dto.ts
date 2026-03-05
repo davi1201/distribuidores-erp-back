@@ -29,8 +29,10 @@ export class CreateBankAccountDto {
   isDefault?: boolean;
 
   @IsString()
-  @IsOptional()
-  pixKey?: string;
+  pixKey: string;
+
+  @IsString()
+  pixKeyType: string; // Ex: CPF, CNPJ, EMAIL, PHONE
 
   @IsBoolean()
   @IsOptional()
@@ -62,6 +64,9 @@ export class UpdateBankAccountDto {
   @IsString()
   @IsOptional()
   pixKey?: string;
+
+  @IsString()
+  pixKeyType: string; // Ex: CPF, CNPJ, EMAIL, PHONE
 
   @IsBoolean()
   @IsOptional()

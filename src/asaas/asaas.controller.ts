@@ -68,4 +68,26 @@ export class AsaasController {
       amount,
     );
   }
+
+  @Get('transactions')
+  async getStatement(
+    @CurrentUser() user: any,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page: string = '1',
+    @Query('limit') limit: string = '20',
+  ) {
+    const tenantId = user.tenantId;
+
+    // Converte a página para o formato "offset" que o Asaas usa
+    const limitNumber = parseInt(limit, 10);
+    const offset = (parseInt(page, 10) - 1) * limitNumber;
+
+    return this.asaasService.getFinancialStatement(tenantId, {
+      startDate,
+      endDate,
+      offset,
+      limit: limitNumber,
+    });
+  }
 }

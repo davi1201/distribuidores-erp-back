@@ -105,6 +105,7 @@ export class UsersService {
       complement: billingProfile?.complement,
       neighborhood: billingProfile?.neighborhood,
       onboardingUrl: tenant?.asaasOnboardingUrl,
+      digitalAccountStatus: tenant?.asaasAccountStatus,
       city: {
         name: billingProfile?.cityName,
         id: billingProfile?.cityId,

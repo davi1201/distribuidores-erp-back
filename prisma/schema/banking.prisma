@@ -10,6 +10,14 @@ enum TransactionType {
   DEBIT
 }
 
+enum PixKeyType {
+  CPF
+  CNPJ
+  EMAIL
+  PHONE
+  EVP
+}
+
 model BankAccount {
   id       String  @id @default(uuid())
   tenantId String
@@ -17,10 +25,10 @@ model BankAccount {
   agency   String?
   account  String?
 
-  isDefault Boolean @default(false)
-  pixKey    String?
-
-  isActive Boolean @default(true)
+  isDefault  Boolean     @default(false)
+  pixKey     String?
+  pixKeyType PixKeyType? // Ex: CPF, CNPJ, EMAIL, PHONE
+  isActive   Boolean     @default(true)
 
   statements        BankStatement[]
   transactions      BankTransaction[]
