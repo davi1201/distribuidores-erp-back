@@ -48,13 +48,19 @@ export class WebhooksService {
     const clerkId = data.id;
 
     const existingUser = await this.prisma.user.findFirst({
-      where: { OR: [{ clerkId: clerkId }, { email: email }] },
+      where: { OR: [{ clerkId }, { email }] },
     });
 
     if (existingUser) {
       await this.prisma.user.update({
         where: { id: existingUser.id },
-        data: { clerkId, email, name, avatarUrl: image },
+        data: {
+          clerkId,
+          email,
+          name,
+          avatarUrl: image,
+          // 🔥 NUNCA sobrescreve role aqui — o linkUserToTenant é o responsável
+        },
       });
     } else {
       await this.prisma.user.create({
@@ -64,11 +70,12 @@ export class WebhooksService {
           name,
           avatarUrl: image,
           password: '',
-          // 🔥 CORREÇÃO: Todo novo cadastro direto nasce como dono de uma futura empresa
-          role: 'OWNER',
+          role: 'SELLER', // Nasce neutro — o membership vai definir a role correta
         },
       });
-      this.logger.log(`✅ Usuário Base criado como OWNER: ${email}`);
+      this.logger.log(
+        `✅ Usuário criado (role pendente de membership): ${email}`,
+      );
     }
   }
 
@@ -105,7 +112,7 @@ export class WebhooksService {
     const clerkUserId =
       data.public_user_data?.user_id || data.public_user_data?.id;
     const clerkOrgId = data.organization?.id;
-    const clerkRole = data.role; // Ex: 'org:owner', 'org:admin', 'org:member', 'org:seller'
+    const clerkRole = data.role; // 'org:owner', 'org:admin', 'org:seller'
 
     if (!clerkUserId || !clerkOrgId) {
       this.logger.warn(
@@ -117,60 +124,49 @@ export class WebhooksService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { clerkId: clerkOrgId },
     });
-
-    if (!tenant) {
-      this.logger.warn(
-        `[RETRY] Tenant ${clerkOrgId} não existe ainda. Aguardando syncTenant.`,
-      );
-      throw new Error(`Tenant não encontrado`);
-    }
+    if (!tenant) throw new Error(`Tenant não encontrado`); // Clerk vai retentar
 
     const user = await this.prisma.user.findUnique({
       where: { clerkId: clerkUserId },
     });
-
-    if (!user) {
-      this.logger.warn(
-        `[RETRY] User ${clerkUserId} não existe ainda. Aguardando syncUser.`,
-      );
-      throw new Error(`Usuário não encontrado`);
-    }
+    if (!user) throw new Error(`Usuário não encontrado`); // Clerk vai retentar
 
     // Trava contra sequestro de Tenant
     if (user.tenantId && user.tenantId !== tenant.id) {
       this.logger.warn(
-        `🛡️ BLOQUEADO: Usuário ${user.email} já pertence à org ID [${user.tenantId}]. Ignorando evento.`,
+        `🛡️ BLOQUEADO: Usuário ${user.email} já pertence à org [${user.tenantId}].`,
       );
       return;
     }
 
-    // 🔥 REGRA FORTE: Definindo a Role
-    let appRole = 'SELLER'; // O padrão para convidados será sempre SELLER
+    // 🔥 FONTE DA VERDADE: sempre o Clerk decide a role
+    const roleMap: Record<string, string> = {
+      'org:owner': 'OWNER',
+      'org:admin': 'ADMIN',
+      'org:seller': 'SELLER',
+    };
 
-    // Se o Clerk explicitly disser que é admin/owner, OU se o nosso banco já souber que ele é o dono (criador original)
-    if (
-      clerkRole === 'org:owner' ||
-      clerkRole === 'org:admin' ||
-      user.role === 'OWNER'
-    ) {
-      appRole = 'OWNER';
-    }
-    // Mapeamento extra para administradores não-donos, se você tiver
-    else if (clerkRole === 'org:sys_admin') {
-      appRole = 'ADMIN';
-    }
+    const appRole = roleMap[clerkRole] ?? 'SELLER';
+
+    // 🛡️ Proteção extra: OWNER nunca pode ser rebaixado por um evento posterior
+    const finalRole =
+      user.tenantId === tenant.id &&
+      user.role === 'OWNER' &&
+      appRole !== 'OWNER'
+        ? 'OWNER'
+        : appRole;
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         tenantId: tenant.id,
-        role: appRole as any,
+        role: finalRole as any,
         isActive: true,
       },
     });
 
     this.logger.log(
-      `✅ Vínculo realizado: User ${user.email} -> Org ${tenant.name} com cargo final: ${appRole}`,
+      `✅ ${user.email} → ${tenant.name} | Clerk: ${clerkRole} → App: ${finalRole}`,
     );
   }
 

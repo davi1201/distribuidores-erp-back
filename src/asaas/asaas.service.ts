@@ -164,10 +164,18 @@ export class AsaasService {
   // 3. PONTO DE VENDA (PDV) - QR CODE DINÂMICO
   // ==========================================================================
 
-  async generatePixIntentForPDV(tenantId: string, amount: number) {
+  async generatePixIntentForPDV(
+    tenantId: string,
+    amount: number,
+    customerId: string,
+  ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { asaasApiKey: true, billingProfile: true },
+    });
+
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
     });
 
     if (!tenant?.asaasApiKey || !tenant.billingProfile?.document) {
@@ -183,8 +191,9 @@ export class AsaasService {
       const asaasCustomerId = await this.getOrCreateAsaasCustomer(
         activeApiKey,
         {
-          name: 'Cliente PDV (Balcão)',
+          name: customer?.name || 'Cliente PDV (Balcão)',
           document: tenant.billingProfile.document,
+          externalId: customerId,
         },
       );
 
