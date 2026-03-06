@@ -213,18 +213,24 @@ export class AsaasOnboardingService {
   }
 
   private async createAsaasAccount(tenant: any) {
+    const payload = {
+      name: tenant.name,
+      email: tenant.billingProfile.email,
+      cpfCnpj: tenant.billingProfile.document,
+      mobilePhone: tenant.billingProfile.phone,
+      incomeValue: 5000,
+      birthDate: tenant.billingProfile.birthDate || '1990-01-01',
+      postalCode: tenant.billingProfile.zipCode || '01001000',
+      addressNumber: tenant.billingProfile.number || 'S/N',
+    };
+
+    console.log('PAYLOAD', payload);
+
     try {
       const response = await axios.post(
         `${this.baseURL}/accounts`,
         {
-          name: tenant.name,
-          email: tenant.billingProfile.email,
-          cpfCnpj: tenant.billingProfile.document,
-          mobilePhone: tenant.billingProfile.phone,
-          incomeValue: 5000,
-          birthDate: tenant.billingProfile.birthDate || '1990-01-01',
-          postalCode: tenant.billingProfile.zipCode || '01001000',
-          addressNumber: tenant.billingProfile.number || 'S/N',
+          ...payload,
         },
         { headers: { access_token: this.masterApiKey } },
       );
