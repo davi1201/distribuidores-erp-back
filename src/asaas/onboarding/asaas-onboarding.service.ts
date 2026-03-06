@@ -213,27 +213,39 @@ export class AsaasOnboardingService {
   }
 
   private async createAsaasAccount(tenant: any) {
-    const payload = {
-      name: tenant.name,
-      email: tenant.billingProfile.email,
-      cpfCnpj: tenant.billingProfile.document,
-      mobilePhone: tenant.billingProfile.phone,
-      incomeValue: 5000,
-      birthDate: tenant.billingProfile.birthDate || '1990-01-01',
-      postalCode: tenant.billingProfile.zipCode || '01001000',
-      addressNumber: tenant.billingProfile.number || 'S/N',
-    };
-
-    console.log('PAYLOAD', payload);
-
     try {
-      const response = await axios.post(
-        `${this.baseURL}/accounts`,
-        {
-          ...payload,
-        },
-        { headers: { access_token: this.masterApiKey } },
-      );
+      // 1. Limpeza rigorosa: Deixa apenas números
+      const cleanCpfCnpj =
+        tenant.billingProfile.document?.replace(/\D/g, '') || '';
+      const cleanPhone = tenant.billingProfile.phone?.replace(/\D/g, '') || '';
+      const cleanZipCode =
+        tenant.billingProfile.zipCode?.replace(/\D/g, '') || '';
+
+      // 2. Formatação da Data (Extrai apenas o YYYY-MM-DD)
+      let formattedBirthDate = '1990-01-01'; // Fallback de segurança
+      if (tenant.billingProfile.birthDate) {
+        const dateObj = new Date(tenant.billingProfile.birthDate);
+        formattedBirthDate = dateObj.toISOString().split('T')[0];
+      }
+
+      const payload = {
+        name: tenant.name,
+        email: tenant.billingProfile.email,
+        cpfCnpj: cleanCpfCnpj,
+        mobilePhone: cleanPhone,
+        incomeValue: 5000,
+        birthDate: formattedBirthDate,
+        postalCode: cleanZipCode,
+        addressNumber: tenant.billingProfile.number || 'S/N',
+      };
+
+      // Log para você conferir como ficou limpo antes de enviar
+      this.logger.debug('Enviando Payload higienizado para o Asaas:', payload);
+
+      const response = await axios.post(`${this.baseURL}/accounts`, payload, {
+        headers: { access_token: this.masterApiKey },
+      });
+
       return response.data;
     } catch (error) {
       this.handleAsaasError(error, 'Erro ao criar subconta no Asaas');
