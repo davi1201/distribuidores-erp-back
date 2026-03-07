@@ -164,21 +164,28 @@ export class AsaasService {
   // 3. PONTO DE VENDA (PDV) - QR CODE DINÂMICO
   // ==========================================================================
 
+  // ==========================================================================
+  // 3. PONTO DE VENDA (PDV) - QR CODE DINÂMICO
+  // ==========================================================================
+
   async generatePixIntentForPDV(
     tenantId: string,
     amount: number,
-    customerId: string,
+    customerId: string, // Pode vir nulo/vazio em vendas anônimas
   ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { asaasApiKey: true, billingProfile: true },
     });
 
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-    });
+    let customer: any = null;
+    if (customerId) {
+      customer = await this.prisma.customer.findUnique({
+        where: { id: customerId },
+      });
+    }
 
-    if (!tenant?.asaasApiKey || !tenant.billingProfile?.document) {
+    if (!tenant?.asaasApiKey) {
       throw new HttpException(
         'Configuração financeira incompleta.',
         HttpStatus.BAD_REQUEST,
@@ -187,13 +194,14 @@ export class AsaasService {
 
     try {
       const activeApiKey = tenant.asaasApiKey;
+      const customerName = customer?.name || 'Cliente PDV (Balcão)';
 
       const asaasCustomerId = await this.getOrCreateAsaasCustomer(
         activeApiKey,
         {
-          name: customer?.name || 'Cliente PDV (Balcão)',
-          document: tenant.billingProfile.document,
-          externalId: customerId,
+          name: customerName,
+          document: customer?.document || '',
+          asaasId: customer?.asaasId,
         },
       );
 
@@ -202,22 +210,19 @@ export class AsaasService {
         billingType: 'PIX',
         value: amount,
         dueDate: new Date().toISOString().split('T')[0],
+        description: `Venda PDV - ${customerName}`,
         externalReference: `PDV_INTENT_${tenantId}`,
       };
 
       const { data: payment } = await axios.post(
         `${this.baseURL}/payments`,
         paymentPayload,
-        {
-          headers: { access_token: activeApiKey },
-        },
+        { headers: { access_token: activeApiKey } },
       );
 
       const { data: qrCode } = await axios.get(
         `${this.baseURL}/payments/${payment.id}/pixQrCode`,
-        {
-          headers: { access_token: activeApiKey },
-        },
+        { headers: { access_token: activeApiKey } },
       );
 
       return {

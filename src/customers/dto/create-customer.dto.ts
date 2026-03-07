@@ -105,4 +105,8 @@ export class CreateCustomerDto {
   @IsString()
   @IsOptional()
   priceListId: string;
+
+  @IsString()
+  @IsOptional()
+  paymentConditionId?: string;
 }

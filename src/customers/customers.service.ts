@@ -298,6 +298,7 @@ export class CustomersService {
       sellerId: customerData.sellerId || null,
       priceListId: customerData.priceListId || null,
       categoryId: customerData.categoryId || null,
+      paymentConditionId: customerData.paymentConditionId || null,
     };
 
     // Lógica de Segurança para Vendedor
@@ -320,7 +321,7 @@ export class CustomersService {
           })),
         },
 
-        // ATUALIZAÇÃO DOS ENDEREÇOS
+        // ATUALIZAÇÃO DOS ENDEREÇOS (FIX AQUI)
         addresses: {
           deleteMany: {},
           create: addresses?.map((a) => ({
@@ -329,23 +330,34 @@ export class CustomersService {
             number: a.number,
             complement: a.complement,
             neighborhood: a.neighborhood,
-            city: a.city,
-            state: a.state,
-            categoryId: a.categoryId,
+            ibgeCode: String(a.ibgeCode || ''),
+
+            // 👇 Correção: Usando 'connect' para relações
+            city: a.city ? { connect: { id: Number(a.city) } } : undefined,
+
+            state: a.state ? { connect: { id: Number(a.state) } } : undefined,
+
+            category: a.categoryId
+              ? { connect: { id: a.categoryId } }
+              : undefined,
           })),
         },
 
-        // ATUALIZAÇÃO DOS ANEXOS (AQUI ESTAVA O PROBLEMA)
+        // ATUALIZAÇÃO DOS ANEXOS
         attachments: {
-          deleteMany: {}, // 1. Apaga os antigos
+          deleteMany: {},
           create:
             attachments?.map((att) => ({
-              // 2. Cria os novos
               name: att.name,
               url: att.url,
               tenantId,
             })) || [],
         },
+      },
+      include: {
+        contacts: true,
+        addresses: { include: { category: true, city: true, state: true } },
+        attachments: true,
       },
     });
   }
