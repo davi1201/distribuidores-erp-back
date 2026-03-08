@@ -2,16 +2,13 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { PlansModule } from './plans/plans.module';
 import { AuthModule } from './auth/auth.module';
-import { AuditService } from './audit/audit.service';
 import { AuditModule } from './audit/audit.module';
-import { APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { AuditInterceptor } from './audit/audit.interceptor';
 import { PaymentModule } from './payment/payment.module';
 import { CustomersModule } from './customers/customers.module';
 import { PriceListsModule } from './price-lists/price-lists.module';
-import { LocationsService } from './locations/locations.service';
 import { LocationsModule } from './locations/locations.module';
-import { StorageService } from './storage/storage.service';
 import { StorageModule } from './storage/storage.module';
 import { UsersModule } from './users/users.module';
 import { TenantsModule } from './tenants/tenants.module';
@@ -20,7 +17,6 @@ import { TaxProfilesModule } from './tax-profiles/tax-profiles.module';
 import { StockModule } from './stock/stock.module';
 import { SalesModule } from './sales/sales.module';
 import { FinancialModule } from './financial/financial.module';
-import { DashboardService } from './dashboard/dashboard.service';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { TeamModule } from './team/team.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
@@ -29,22 +25,41 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { PaymentTermModule } from './payment-term/payment-term.module';
-import { CommissionsService } from './commissions/commissions.service';
-import { CommissionsController } from './commissions/commissions.controller';
 import { CommissionsModule } from './commissions/commissions.module';
-import { PrismaService } from './prisma/prisma.service';
 import { ConfigModule } from '@nestjs/config';
 import { BankReconciliationModule } from './bank-reconciliation/bank-reconciliation.module';
 import { BankAccountsModule } from './bank-accounts/bank-accounts.module';
-import { AsaasService } from './asaas/asaas.service';
 import { AsaasModule } from './asaas/asaas.module';
 import { MailModule } from './mail/mail.module';
-import { SystemController } from './system/system.controller';
-import { SystemService } from './system/system.service';
+import { SystemModule } from './system/system.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { CommonModule } from './common/common.module';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import configuration from './config/configuration';
+
+// Clean Architecture Modules
+import { DatabaseModule } from './infrastructure/database/database.module';
+import { FinancialModuleV2 } from './modules/financial/financial.module';
+import { CacheModule } from './infrastructure/cache/cache.module';
+import { LoggingModule } from './core/logging/logging.module';
+import { ThrottlerModule } from './infrastructure/throttler/throttler.module';
+import { QueueModule } from './infrastructure/queue/queue.module';
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load: [configuration],
+    }),
+    ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
+    // Infrastructure
+    LoggingModule,
+    CacheModule,
+    ThrottlerModule, // Rate Limiting
+    QueueModule.forRoot(), // Background Jobs (requires REDIS_ENABLED=true)
+    DatabaseModule,
+    CommonModule,
     PrismaModule,
     PlansModule,
     AuthModule,
@@ -61,33 +76,32 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     StockModule,
     SalesModule,
     FinancialModule,
+    // Clean Architecture Modules
+    FinancialModuleV2,
     DashboardModule,
     TeamModule,
     SuppliersModule,
     NfeModule,
-    ScheduleModule.forRoot(),
     NotificationsModule,
     WebhooksModule,
     PaymentTermModule,
     CommissionsModule,
-    ConfigModule.forRoot({ isGlobal: true }),
     BankReconciliationModule,
     BankAccountsModule,
     AsaasModule,
     MailModule,
-    EventEmitterModule.forRoot(),
+    SystemModule,
   ],
-  controllers: [CommissionsController, SystemController],
+  controllers: [],
   providers: [
-    AuditService,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: AuditInterceptor,
     },
-    LocationsService,
-    StorageService,
-    DashboardService,
-    SystemService,
   ],
 })
 export class AppModule {}

@@ -2,16 +2,16 @@ import {
   CanActivate,
   ExecutionContext,
   Injectable,
-  Logger,
   UnauthorizedException,
   ForbiddenException,
 } from '@nestjs/common';
+import { createLogger } from '../../core/logging';
 import { clerkClient } from '@clerk/clerk-sdk-node';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
-  private readonly logger = new Logger(ClerkAuthGuard.name);
+  private readonly logger = createLogger(ClerkAuthGuard.name);
 
   constructor(private readonly prisma: PrismaService) {}
 

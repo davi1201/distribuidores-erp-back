@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { BankReconciliationService } from './bank-reconciliation.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('bank-reconciliation')
 @UseGuards(ClerkAuthGuard)

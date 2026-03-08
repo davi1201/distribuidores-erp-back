@@ -3,16 +3,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateStockMovementDto,
   MovementType,
 } from './dto/create-movement.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
-import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber } from '../core/utils/number.utils';
 
 @Injectable()
 export class StockService {
+  private readonly logger = createLogger(StockService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly notificationsService: NotificationsService,
@@ -131,15 +138,15 @@ export class StockService {
       });
     }
 
-    const moveQty = Number(dto.quantity);
+    const moveQty = toNumber(dto.quantity);
 
     // Validação prévia de saldo (para UX, a validação real ocorre no DB)
     if (
       dto.type === MovementType.EXIT &&
-      Number(stockItem.quantity) < moveQty
+      toNumber(stockItem.quantity) < moveQty
     ) {
       throw new BadRequestException(
-        `Saldo insuficiente na ${warehouse.name}. Atual: ${Number(stockItem.quantity)}, Saída: ${moveQty}`,
+        `Saldo insuficiente na ${warehouse.name}. Atual: ${toNumber(stockItem.quantity)}, Saída: ${moveQty}`,
       );
     }
 
@@ -155,7 +162,7 @@ export class StockService {
         data: { quantity: operation },
       });
 
-      if (Number(updatedStock.quantity) < 0) {
+      if (toNumber(updatedStock.quantity) < 0) {
         throw new BadRequestException(
           `Saldo insuficiente na ${warehouse.name}.`,
         );
@@ -198,9 +205,8 @@ export class StockService {
       reason?: string;
     },
   ) {
-    const qty = Number(data.quantity);
-    if (qty <= 0)
-      throw new BadRequestException('Quantidade deve ser positiva.');
+    const qty = toNumber(data.quantity);
+    if (qty <= 0) throw new BadRequestException(ERROR_MESSAGES.INVALID_AMOUNT);
 
     // Validação de Existência
     const [destinationWarehouse, product] = await Promise.all([
@@ -212,7 +218,9 @@ export class StockService {
     ]);
 
     if (!destinationWarehouse || destinationWarehouse.tenantId !== tenantId) {
-      throw new NotFoundException('Depósito de destino não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.WAREHOUSE),
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -227,9 +235,9 @@ export class StockService {
         include: { warehouse: true },
       });
 
-      if (!sourceItem || Number(sourceItem.quantity) < qty) {
+      if (!sourceItem || toNumber(sourceItem.quantity) < qty) {
         throw new BadRequestException(
-          `Saldo insuficiente na origem (${sourceItem?.warehouse?.name || 'Origem'}). Disponível: ${Number(sourceItem?.quantity || 0)}`,
+          `Saldo insuficiente na origem (${sourceItem?.warehouse?.name || 'Origem'}). Disponível: ${toNumber(sourceItem?.quantity || 0)}`,
         );
       }
 
@@ -352,7 +360,10 @@ export class StockService {
     });
 
     return products.map((p) => {
-      const totalQty = p.stock.reduce((acc, s) => acc + Number(s.quantity), 0);
+      const totalQty = p.stock.reduce(
+        (acc, s) => acc + toNumber(s.quantity),
+        0,
+      );
 
       return {
         id: p.id,
@@ -456,11 +467,13 @@ export class StockService {
       });
 
       if (!transfer) {
-        throw new NotFoundException('Transferência não encontrada.');
+        throw new NotFoundException(
+          ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.STOCK_TRANSFER),
+        );
       }
 
       if (transfer.status !== 'PENDING')
-        throw new BadRequestException('Status inválido.');
+        throw new BadRequestException('Transferência não está pendente.');
 
       // CORREÇÃO: Buscamos quem está aprovando AGORA para pegar o nome
       const approver = await tx.user.findUnique({
@@ -482,7 +495,7 @@ export class StockService {
 
         if (
           !stockOrigin ||
-          Number(stockOrigin.quantity) < Number(item.quantity)
+          toNumber(stockOrigin.quantity) < toNumber(item.quantity)
         ) {
           throw new BadRequestException(
             `Saldo insuficiente na origem para o produto ${item.productId}`,
@@ -505,7 +518,8 @@ export class StockService {
             reason: `Transferência #${(transfer as any).code || transfer.id} (Em Trânsito)`,
             quantity: item.quantity,
             userId,
-            balanceAfter: Number(stockOrigin.quantity) - Number(item.quantity),
+            balanceAfter:
+              toNumber(stockOrigin.quantity) - toNumber(item.quantity),
           },
         });
       }
@@ -548,7 +562,9 @@ export class StockService {
       });
 
       if (!transfer) {
-        throw new NotFoundException('Transferência não encontrada.');
+        throw new NotFoundException(
+          ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.STOCK_TRANSFER),
+        );
       }
 
       if (transfer.status !== 'IN_TRANSIT')
@@ -586,7 +602,7 @@ export class StockService {
             reason: `Recebimento Transferência #${(transfer as any).code || transfer.id}`,
             quantity: item.quantity,
             userId,
-            balanceAfter: Number(stockDest.quantity),
+            balanceAfter: toNumber(stockDest.quantity),
           },
         });
       }
@@ -619,7 +635,7 @@ export class StockService {
       ...stockItems.map((item) =>
         this.prisma.stockItem.update({
           where: { id: item.id },
-          data: { quantity: quantity + Number(item.quantity) },
+          data: { quantity: quantity + toNumber(item.quantity) },
         }),
       ),
       this.prisma.stockMovement.create({

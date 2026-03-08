@@ -6,7 +6,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { UpdatePermissionsDto } from './dto/update-permissions.dto';
 import { RolesGuard } from '../auth/guards/roles.guard';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('users')
 @UseGuards(ClerkAuthGuard, RolesGuard)

@@ -11,9 +11,9 @@ import { Role, type User } from '@prisma/client';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { TenantsService } from './tenants.service';
 import { UpdateBillingProfileDto } from '../users/dto/update-billing-profile.dto';
-import { Roles } from 'src/auth/decorators/roles.decorator';
-import { SaveNfeEmailConfigDto } from './dto/create-nfe-email-config.dto';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { SaveNfeEmailConfigDto } from '../nfe/dto/create-nfe-email-config.dto';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('tenants')
 @UseGuards(ClerkAuthGuard)

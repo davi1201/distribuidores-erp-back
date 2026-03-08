@@ -6,11 +6,11 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 
-import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
-import { Roles } from 'src/auth/decorators/roles.decorator';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { ClerkAuthGuard } from '../../auth/guards/clerk-auth.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
 
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { AsaasBillingService } from './asaas-billing.service';
 import { AsaasCheckoutDto } from '../dto/asaas-checkout.dto';
 

@@ -3,12 +3,16 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { XMLParser } from 'fast-xml-parser';
 import { ProductsService } from '../products/products.service';
-import { StockService } from 'src/stock/stock.service';
+import { StockService } from '../stock/stock.service';
 import { FinancialService } from '../financial/financial.service'; // Importação do Financial
 import type { User } from '@prisma/client';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber } from '../core/utils';
 
 type ParsedItem = {
   index: number;
@@ -122,7 +126,8 @@ export class NfeService {
 
     const nfeProc = jsonObj?.nfeProc || jsonObj;
     const infNFe = nfeProc?.NFe?.infNFe;
-    if (!infNFe) throw new BadRequestException('Estrutura NFe não encontrada.');
+    if (!infNFe)
+      throw new BadRequestException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.NFE));
 
     // Tratamento de array unitário
     const detArray = Array.isArray(infNFe.det) ? infNFe.det : [infNFe.det];
@@ -130,12 +135,12 @@ export class NfeService {
     // Cálculo robusto do total (caso falte a tag <total>)
     const calculatedProductsTotal = detArray.reduce(
       (acc: number, curr: any) => {
-        return acc + (Number(curr.prod?.vProd) || 0);
+        return acc + (toNumber(curr.prod?.vProd) || 0);
       },
       0,
     );
 
-    const xmlTotal = Number(infNFe.total?.ICMSTot?.vNF);
+    const xmlTotal = toNumber(infNFe.total?.ICMSTot?.vNF);
     const finalTotalAmount =
       !isNaN(xmlTotal) && xmlTotal > 0 ? xmlTotal : calculatedProductsTotal;
 
@@ -192,9 +197,9 @@ export class NfeService {
           ncm: prod.NCM ? String(prod.NCM) : undefined,
           cfop: prod.CFOP ? String(prod.CFOP) : undefined,
           unit: prod.uCom,
-          quantity: Number(prod.qCom) || 0,
-          unitPrice: Number(prod.vUnCom) || 0,
-          totalPrice: Number(prod.vProd) || undefined,
+          quantity: toNumber(prod.qCom) || 0,
+          unitPrice: toNumber(prod.vUnCom) || 0,
+          totalPrice: toNumber(prod.vProd) || undefined,
           suggestedAction: foundByCode ? 'LINK_EXISTING' : 'NEW',
           id: foundByCode ? foundByCode.id : null,
           suggestedTargetIndex: null,
@@ -261,7 +266,7 @@ export class NfeService {
           const markup = item.unitPrice * (defaultMarkupPct / 100);
           const basePrice = item.unitPrice + markup;
           const adjustment =
-            basePrice * (Number(pl.percentageAdjustment) / 100);
+            basePrice * (toNumber(pl.percentageAdjustment) / 100);
           return {
             priceListId: pl.id,
             price: basePrice + adjustment,
@@ -384,7 +389,7 @@ export class NfeService {
 
     // 5. GERAÇÃO AUTOMÁTICA DE CONTAS A PAGAR (INTEGRAÇÃO ATUALIZADA)
     if (financial?.generate) {
-      const totalAmount = Number(nfe.totalAmount) || 0;
+      const totalAmount = toNumber(nfe.totalAmount) || 0;
       let installmentsPlan: any[] = [];
       const startDate: Date | string = new Date(); // Data base para cálculo (Hoje)
 
@@ -393,9 +398,9 @@ export class NfeService {
 
       // Se NÃO tiver paymentTermId, montamos o plano com base na configuração manual (fallback/A Combinar)
       if (!paymentTermId) {
-        const entryAmount = Number(financial.entryAmount || 0);
-        const installmentsCount = Number(financial.installmentsCount || 1);
-        const daysInterval = Number(financial.daysInterval || 30);
+        const entryAmount = toNumber(financial.entryAmount || 0);
+        const installmentsCount = toNumber(financial.installmentsCount || 1);
+        const daysInterval = toNumber(financial.daysInterval || 30);
         // Se houver data específica para primeira parcela, calculamos o delay em dias
         const firstDueDate = financial.firstDueDate
           ? new Date(financial.firstDueDate)
@@ -426,7 +431,7 @@ export class NfeService {
           for (let i = 0; i < installmentsCount; i++) {
             installmentsPlan.push({
               days: safeStartDelay + i * daysInterval,
-              percent: Number(installmentPercent.toFixed(4)),
+              percent: toNumber(installmentPercent.toFixed(4)),
             });
           }
         }
@@ -510,12 +515,14 @@ export class NfeService {
     ]);
 
     if (!productDb)
-      throw new BadRequestException(`Produto ${productId} não encontrado.`);
+      throw new BadRequestException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PRODUCT),
+      );
 
-    const currentQty = Number(stockItem?.quantity || 0);
-    const currentCost = Number(productDb.costPrice || 0);
-    const incomingQty = Number(item.quantity);
-    const incomingCost = Number(item.unitPrice);
+    const currentQty = toNumber(stockItem?.quantity || 0);
+    const currentCost = toNumber(productDb.costPrice || 0);
+    const incomingQty = toNumber(item.quantity);
+    const incomingCost = toNumber(item.unitPrice);
 
     const { avgCost } = this.calculateWeightedAverages(
       currentQty,
@@ -557,7 +564,7 @@ export class NfeService {
         },
       });
 
-      const currentMarkup = Number(productDb.markup || 0);
+      const currentMarkup = toNumber(productDb.markup || 0);
       if (currentMarkup > 0) {
         for (const pl of priceLists) {
           const newSellingPrice = avgCost * (1 + currentMarkup / 100);
@@ -638,7 +645,7 @@ export class NfeService {
     });
 
     if (!item || item.tenantId !== tenantId) {
-      throw new NotFoundException('Item não encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.NFE));
     }
 
     if (item.status !== 'PENDING') {

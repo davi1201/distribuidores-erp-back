@@ -1,14 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionType, Prisma } from '@prisma/client';
 import { differenceInDays } from 'date-fns';
-
-export interface BankTransactionData {
-  id: string;
-  type: TransactionType | 'CREDIT' | 'DEBIT';
-  amount: Prisma.Decimal | number | string;
-  date: Date | string;
-  description: string;
-}
+import { BankTransactionData } from './interfaces/bank-reconciliation.interfaces';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class MatchingEngineService {
@@ -19,7 +13,7 @@ export class MatchingEngineService {
       reason: string;
     }> = [];
 
-    const bankAmount = Number(bankTx.amount);
+    const bankAmount = toNumber(bankTx.amount);
     const bankDate = new Date(bankTx.date);
 
     for (const title of openTitles) {
@@ -29,7 +23,7 @@ export class MatchingEngineService {
 
       if (!isSameType) continue;
 
-      const titleBalance = Number(title.balance);
+      const titleBalance = toNumber(title.balance);
       const isExactAmount = Math.abs(bankAmount - titleBalance) < 0.01;
 
       const titleDueDate = new Date(title.dueDate);
@@ -69,7 +63,7 @@ export class MatchingEngineService {
       id: title.id,
       description: title.description,
       customerName: personName, // <-- Campo isolado adicionado aqui
-      amount: Number(title.balance),
+      amount: toNumber(title.balance),
       dueDate: title.dueDate,
       titleNumber: title.titleNumber,
     };

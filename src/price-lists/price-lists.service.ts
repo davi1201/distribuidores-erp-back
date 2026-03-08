@@ -7,6 +7,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreatePriceListDto } from './dto/create-price-list.dto';
 import { UpdatePriceListDto } from './dto/update-price-list.dto'; // Crie extendendo o Create (PartialType)
 
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber, roundTo } from '../core/utils';
+
 @Injectable()
 export class PriceListsService {
   constructor(private prisma: PrismaService) {}
@@ -29,11 +33,11 @@ export class PriceListsService {
 
       if (products.length > 0) {
         // 3. Prepara os dados para inserção em massa
-        const adjustment = Number(createDto.percentageAdjustment) || 0;
+        const adjustment = toNumber(createDto.percentageAdjustment) || 0;
 
         const pricesToCreate = products.map((product) => {
-          const cost = Number(product.costPrice) || 0;
-          const markup = Number(product.markup) || 0;
+          const cost = toNumber(product.costPrice) || 0;
+          const markup = toNumber(product.markup) || 0;
 
           const baseSellingPrice = cost * (1 + markup / 100);
           const finalPrice = baseSellingPrice * (1 + adjustment / 100);
@@ -42,7 +46,7 @@ export class PriceListsService {
             tenantId,
             productId: product.id,
             priceListId: priceList.id,
-            price: Number(finalPrice.toFixed(2)), // Arredonda para 2 casas decimais
+            price: roundTo(finalPrice, 2), // Arredonda para 2 casas decimais
           };
         });
 
@@ -74,7 +78,9 @@ export class PriceListsService {
     });
 
     if (!priceList || priceList.tenantId !== tenantId) {
-      throw new NotFoundException('Tabela de preço não encontrada');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PRICE_LIST),
+      );
     }
 
     return priceList;
@@ -94,8 +100,8 @@ export class PriceListsService {
       // Se houve, precisamos recalcular os preços de todos os produtos
       if (
         updateDto.percentageAdjustment !== undefined &&
-        Number(updateDto.percentageAdjustment) !==
-          Number(existingPriceList.percentageAdjustment)
+        toNumber(updateDto.percentageAdjustment) !==
+          toNumber(existingPriceList.percentageAdjustment)
       ) {
         // A. Busca produtos ativos para recalcular
         const products = await tx.product.findMany({
@@ -111,11 +117,12 @@ export class PriceListsService {
           });
 
           // C. Prepara novos preços
-          const adjustment = Number(updatedPriceList.percentageAdjustment) || 0;
+          const adjustment =
+            toNumber(updatedPriceList.percentageAdjustment) || 0;
 
           const pricesToCreate = products.map((product) => {
-            const cost = Number(product.costPrice) || 0;
-            const markup = Number(product.markup) || 0;
+            const cost = toNumber(product.costPrice) || 0;
+            const markup = toNumber(product.markup) || 0;
 
             // Preço Base = Custo + Markup do Produto
             const baseSellingPrice = cost * (1 + markup / 100);
@@ -127,7 +134,7 @@ export class PriceListsService {
               tenantId,
               productId: product.id,
               priceListId: id,
-              price: Number(finalPrice.toFixed(2)),
+              price: roundTo(finalPrice, 2),
             };
           });
 

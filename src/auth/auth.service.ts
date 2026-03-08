@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -11,7 +12,10 @@ import { Role } from '@prisma/client';
 import { addDays } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
-// Importações de DTOs devem ser classes reais, não "import type"
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES, DEFAULTS } from '../core/constants';
+
+// DTOs
 import { LoginDto } from './dto/login.dto';
 import { RegisterSimpleDto } from './dto/register-simple.dto';
 import { RegisterDto } from './dto/create-auth.dto';
@@ -122,7 +126,9 @@ export class AuthService {
     const plan = await this.prisma.plan.findUnique({
       where: { slug: planSlug },
     });
-    if (!plan) throw new NotFoundException('Plano não encontrado.');
+    if (!plan) {
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PLAN));
+    }
 
     const tempSlug = `tenant-${uuidv4().substring(0, 8)}`;
     const tempCompanyName = `Empresa de ${data.name.split(' ')[0]}`;

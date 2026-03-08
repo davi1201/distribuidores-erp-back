@@ -1,11 +1,16 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { createLogger } from '../../core/logging';
 
 import axios from 'axios';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../../core/constants';
+import { toNumber } from '../../core/utils';
 
 @Injectable()
 export class AsaasBillingService {
-  private readonly logger = new Logger(AsaasBillingService.name);
+  private readonly logger = createLogger(AsaasBillingService.name);
   private readonly masterApiKey = process.env.ASAAS_MASTER_API_KEY;
   private readonly baseURL =
     process.env.ASAAS_API_URL || 'https://sandbox.asaas.com/api/v3';
@@ -92,7 +97,10 @@ export class AsaasBillingService {
 
     const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
     if (!plan)
-      throw new HttpException('Plano não encontrado.', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PLAN),
+        HttpStatus.NOT_FOUND,
+      );
 
     const planPrice = cycle === 'YEARLY' ? plan.yearlyPrice : plan.price;
     if (!planPrice)
@@ -174,7 +182,7 @@ export class AsaasBillingService {
           {
             customer: customerId,
             billingType: 'CREDIT_CARD',
-            value: Number(planPrice),
+            value: toNumber(planPrice),
             nextDueDate: now.toISOString().split('T')[0],
             cycle: 'MONTHLY',
             description: `Assinatura ${plan.name} - Mensal`,
@@ -192,8 +200,8 @@ export class AsaasBillingService {
             customer: customerId,
             billingType: 'CREDIT_CARD',
             installmentCount: installments,
-            installmentValue: Number(
-              (Number(planPrice) / installments).toFixed(2),
+            installmentValue: toNumber(
+              (toNumber(planPrice) / installments).toFixed(2),
             ),
             dueDate: now.toISOString().split('T')[0],
             description: `Assinatura ${plan.name} - Anual (${installments}x)`,
@@ -317,7 +325,7 @@ export class AsaasBillingService {
           {
             customer: customerId,
             billingType: 'CREDIT_CARD',
-            value: Number(planPrice),
+            value: toNumber(planPrice),
             nextDueDate: now.toISOString().split('T')[0],
             cycle: 'MONTHLY',
             description: `Upgrade para ${newPlan.name} - Mensal`,
@@ -335,8 +343,8 @@ export class AsaasBillingService {
             customer: customerId,
             billingType: 'CREDIT_CARD',
             installmentCount: installments,
-            installmentValue: Number(
-              (Number(planPrice) / installments).toFixed(2),
+            installmentValue: toNumber(
+              (toNumber(planPrice) / installments).toFixed(2),
             ),
             dueDate: now.toISOString().split('T')[0],
             description: `Upgrade para ${newPlan.name} - Anual (${installments}x)`,

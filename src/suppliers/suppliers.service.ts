@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,7 +9,10 @@ import {
   CreateSupplierDto,
   LinkProductSupplierDto,
 } from './dto/create-supplier.dto';
-import { UpdateSupplierDto } from './dto/update-supplier.dto'; // Crie usando PartialType
+import { UpdateSupplierDto } from './dto/update-supplier.dto';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class SuppliersService {
@@ -58,7 +62,9 @@ export class SuppliersService {
     });
 
     if (!supplier || supplier.tenantId !== tenantId) {
-      throw new NotFoundException('Fornecedor não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.SUPPLIER),
+      );
     }
 
     return supplier;

@@ -18,9 +18,9 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { CalculatePriceDto } from './dto/calculate-price.dto';
-import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Roles } from 'src/auth/decorators/roles.decorator';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('products')
 @UseGuards(ClerkAuthGuard, RolesGuard)

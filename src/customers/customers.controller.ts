@@ -11,7 +11,8 @@ import {
   Req,
   Query,
 } from '@nestjs/common';
-import { CustomersService, FindCustomersFilters } from './customers.service';
+import { CustomersService } from './customers.service';
+import { FindCustomersFilters } from './interfaces/customer.interfaces';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CategoryDto } from './dto/category.dto';
@@ -23,7 +24,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { BillingGuard } from '../auth/guards/billing.guard';
 import { PermissionsGuard } from '../auth/guards/permissions.guard';
 import { RequirePermissions } from '../auth/decorators/permissions.decorator';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('customers')
 @UseGuards(ClerkAuthGuard, RolesGuard, BillingGuard, PermissionsGuard)

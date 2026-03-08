@@ -2,12 +2,16 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantsService } from '../tenants/tenants.service';
 import { parse } from 'date-fns';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class UsersService {
@@ -34,7 +38,9 @@ export class UsersService {
       },
     });
 
-    if (!user) throw new NotFoundException('Usuário não encontrado.');
+    if (!user) {
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.USER));
+    }
 
     const tenant = user.tenant || null;
     const activeSub = tenant?.subscriptions[0];
@@ -122,7 +128,8 @@ export class UsersService {
     data: { name?: string; email?: string; phone?: string; avatarUrl?: string },
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new NotFoundException('Usuário não encontrado.');
+    if (!user)
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.USER));
 
     if (data.email && data.email !== user.email) {
       const emailExists = await this.prisma.user.findUnique({
@@ -158,13 +165,15 @@ export class UsersService {
     });
 
     if (data.cityId && !city)
-      throw new NotFoundException('Cidade não encontrada.');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CITY));
 
     if (data.stateId && !state)
-      throw new NotFoundException('Estado não encontrado.');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.STATE));
 
     if (!user || !user.tenantId)
-      throw new NotFoundException('Empresa não encontrada.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.TENANT),
+      );
 
     await this.prisma.$transaction(async (tx) => {
       if (data.companyName) {
@@ -234,7 +243,8 @@ export class UsersService {
       where: { id: targetUserId },
     });
 
-    if (!targetUser) throw new NotFoundException('Usuário não encontrado');
+    if (!targetUser)
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.USER));
 
     if (targetUser.tenantId !== currentUser.tenantId) {
       throw new ForbiddenException('Acesso negado');

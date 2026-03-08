@@ -9,7 +9,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 
 @WebSocketGateway({
   cors: {
@@ -23,7 +23,7 @@ export class NotificationsGateway
 {
   // <--- Implemente
   @WebSocketServer() server: Server;
-  private logger: Logger = new Logger('NotificationsGateway');
+  private logger = createLogger('NotificationsGateway');
 
   // --- ADICIONE ESTE MÉTODO ---
   afterInit(server: Server) {

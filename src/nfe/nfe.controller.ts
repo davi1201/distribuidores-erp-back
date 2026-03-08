@@ -14,9 +14,9 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { NfeService } from './nfe.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('nfe')
 @UseGuards(ClerkAuthGuard)

@@ -1,8 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaxProfileDto } from './dto/create-tax-profile.dto';
 import { UpdateTaxProfileDto } from './dto/update-tax-profile.dto';
 import { User } from '@prisma/client';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class TaxProfilesService {
@@ -53,7 +56,9 @@ export class TaxProfilesService {
     });
 
     if (!profile || profile.tenantId !== tenantId) {
-      throw new NotFoundException('Perfil tributário não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.TAX_PROFILE),
+      );
     }
 
     return profile;

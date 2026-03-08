@@ -1,14 +1,19 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import axios from 'axios';
-import { MailService } from 'src/mail/mail.service';
+import { MailService } from '../mail/mail.service';
 import { buildBoletoEmail } from '../mail/templates/boleto.template';
-import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { OnEvent } from '@nestjs/event-emitter';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class AsaasService {
-  private readonly logger = new Logger(AsaasService.name);
+  private readonly logger = createLogger(AsaasService.name);
 
   private readonly masterApiKey = process.env.ASAAS_MASTER_API_KEY;
   private readonly baseURL =
@@ -111,7 +116,10 @@ export class AsaasService {
     });
 
     if (!title)
-      throw new HttpException('Título não encontrado.', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.FINANCIAL_TITLE),
+        HttpStatus.NOT_FOUND,
+      );
     if (title.asaasPaymentId)
       throw new HttpException('Boleto já emitido.', HttpStatus.BAD_REQUEST);
 
@@ -128,7 +136,7 @@ export class AsaasService {
         {
           customer: asaasCustomerId,
           billingType: 'BOLETO',
-          value: Number(title.balance),
+          value: toNumber(title.balance),
           dueDate: title.dueDate.toISOString().split('T')[0],
           description: `Parcela ${title.installmentNumber || 1} - Pedido #${title.orderId?.substring(0, 8)}`,
           externalReference: title.id,
@@ -406,7 +414,7 @@ export class AsaasService {
     const html = buildBoletoEmail({
       customerName: title.customer.name,
       orderId: title.orderId || 'Avulso',
-      amount: Number(title.balance),
+      amount: toNumber(title.balance),
       dueDate: title.dueDate,
       boletoUrl: url,
     });

@@ -4,15 +4,15 @@ import {
   Headers,
   Body,
   BadRequestException,
-  Logger,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { Webhook } from 'svix';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { addDays } from 'date-fns';
 
 @Controller('webhooks')
 export class WebhooksController {
-  private readonly logger = new Logger(WebhooksController.name);
+  private readonly logger = createLogger(WebhooksController.name);
 
   constructor(private readonly prisma: PrismaService) {}
 

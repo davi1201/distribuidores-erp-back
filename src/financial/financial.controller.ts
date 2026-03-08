@@ -14,7 +14,7 @@ import { RegisterPaymentDto } from './dto/register-payment.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client'; // Importa a tipagem do Prisma
 // Ajuste o import do Guard conforme sua estrutura (ClerkAuthGuard ou JwtAuthGuard)
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('financial')
 @UseGuards(ClerkAuthGuard)

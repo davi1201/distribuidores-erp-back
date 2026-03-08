@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { StockService } from './stock.service';
 import { StockController } from './stock.controller';
-import { PrismaModule } from '../prisma/prisma.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [NotificationsModule],
   controllers: [StockController],
   providers: [StockService],
-  exports: [StockService], // Exporta para usar em Vendas (quando vender, chama o service de stock)
+  exports: [StockService],
 })
 export class StockModule {}

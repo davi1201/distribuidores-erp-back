@@ -14,7 +14,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { CreateTransferDto } from './dto/create-transfer.dto';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('stock')
 @UseGuards(ClerkAuthGuard)
@@ -41,7 +41,6 @@ export class StockController {
 
   @Get('transfers')
   findAllTransfers(@CurrentUser() user: User) {
-    
     return this.stockService.findAllTransfers(user, user.tenantId || '');
   }
 

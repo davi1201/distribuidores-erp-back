@@ -1,11 +1,15 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { createLogger } from '../../core/logging';
 import { OnEvent } from '@nestjs/event-emitter';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import axios from 'axios';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../../core/constants';
 
 @Injectable()
 export class AsaasOnboardingService {
-  private readonly logger = new Logger(AsaasOnboardingService.name);
+  private readonly logger = createLogger(AsaasOnboardingService.name);
 
   private readonly masterApiKey = process.env.ASAAS_MASTER_API_KEY;
   private readonly baseURL =
@@ -200,7 +204,10 @@ export class AsaasOnboardingService {
     });
 
     if (!tenant)
-      throw new HttpException('Tenant não encontrado.', HttpStatus.NOT_FOUND);
+      throw new HttpException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.TENANT),
+        HttpStatus.NOT_FOUND,
+      );
 
     const profile = tenant.billingProfile;
     if (!profile?.document || !profile?.phone || !profile?.email) {

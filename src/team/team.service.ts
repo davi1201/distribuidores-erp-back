@@ -3,16 +3,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
-  Logger,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, User } from '@prisma/client';
 import { clerkClient } from '@clerk/clerk-sdk-node';
 import { InviteMemberDto } from './dto/invite-member.dto';
 
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+
 @Injectable()
 export class TeamService {
-  private readonly logger = new Logger(TeamService.name);
+  private readonly logger = createLogger(TeamService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -59,7 +62,10 @@ export class TeamService {
       },
     });
 
-    if (!tenant) throw new NotFoundException('Tenant não encontrado.');
+    if (!tenant)
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.TENANT),
+      );
 
     if (!tenant.clerkId) {
       throw new BadRequestException(
@@ -167,7 +173,7 @@ export class TeamService {
     });
 
     if (!targetUser || targetUser.tenantId !== tenantId) {
-      throw new NotFoundException('Usuário não encontrado.');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.USER));
     }
 
     if (targetUser.id === actingUser.id) {
@@ -227,7 +233,7 @@ export class TeamService {
     });
 
     if (!targetUser || targetUser.tenantId !== tenantId) {
-      throw new NotFoundException('Usuário não encontrado.');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.USER));
     }
 
     if (targetUser.id === actingUser.id) {

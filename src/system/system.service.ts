@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class SystemService {
@@ -34,15 +35,15 @@ export class SystemService {
         tenantConfigId: config?.id || null,
         customName: config?.customName || sysMethod.name,
         isActive: config?.isActive || false,
-        discountPercentage: config ? Number(config.discountPercentage) : 0,
+        discountPercentage: config ? toNumber(config.discountPercentage) : 0,
         maxInstallments: config?.maxInstallments || 1,
-        minInstallmentValue: config ? Number(config.minInstallmentValue) : 0,
+        minInstallmentValue: config ? toNumber(config.minInstallmentValue) : 0,
         passFeeToCustomer: config?.passFeeToCustomer || false,
         isAnticipated: config?.isAnticipated ?? true,
         installments:
           config?.installments.map((i) => ({
             installment: i.installment,
-            feePercentage: Number(i.feePercentage),
+            feePercentage: toNumber(i.feePercentage),
             receiveInDays: i.receiveInDays,
           })) || [],
       };

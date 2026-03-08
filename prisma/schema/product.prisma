@@ -51,6 +51,8 @@ model Product {
   @@unique([tenantId, sku])
   // Índices para performance
   @@index([tenantId, name])
+  @@index([tenantId, isActive])
+  @@index([tenantId, parentId])
   @@map("products")
 }
 

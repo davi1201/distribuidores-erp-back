@@ -1,18 +1,21 @@
 import {
   Injectable,
   NotFoundException,
-  Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateBillingProfileDto } from '../users/dto/update-billing-profile.dto';
 import { User } from '@prisma/client';
-import { SaveNfeEmailConfigDto } from './dto/create-nfe-email-config.dto';
+import { SaveNfeEmailConfigDto } from '../nfe/dto/create-nfe-email-config.dto';
 import * as imap from 'imap-simple';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class TenantsService {
-  private readonly logger = new Logger(TenantsService.name);
+  private readonly logger = createLogger(TenantsService.name);
 
   constructor(private prisma: PrismaService) {}
 
@@ -127,7 +130,10 @@ export class TenantsService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    if (!tenant) throw new NotFoundException('Tenant não encontrado.');
+    if (!tenant)
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.TENANT),
+      );
 
     // Upsert: Cria se não existe, Atualiza se existe
     return this.prisma.tenantEmailConfig.upsert({
@@ -230,7 +236,9 @@ export class TenantsService {
     });
 
     if (!systemMethod) {
-      throw new NotFoundException('Método de pagamento base não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PAYMENT_METHOD),
+      );
     }
 
     // 2. Executar a gravação em uma transação para garantir consistência

@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import Pusher from 'pusher';
 
 @Injectable()
 export class NotificationsService {
   private pusher: Pusher;
-  private readonly logger = new Logger(NotificationsService.name);
+  private readonly logger = createLogger(NotificationsService.name);
 
   constructor() {
     // Estas chaves você pega no dashboard do Pusher ao criar o App

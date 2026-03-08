@@ -1,13 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import * as ofx from 'ofx';
-
-export interface ParsedBankTransaction {
-  fitId: string;
-  type: 'CREDIT' | 'DEBIT';
-  amount: number;
-  date: Date;
-  description: string;
-}
+import { ParsedBankTransaction } from './interfaces/bank-reconciliation.interfaces';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class OfxParserService {
@@ -30,8 +24,8 @@ export class OfxParserService {
 
       return transactions.map((tx: any) => ({
         fitId: tx.FITID,
-        type: Number(tx.TRNAMT) >= 0 ? 'CREDIT' : 'DEBIT',
-        amount: Math.abs(Number(tx.TRNAMT)), // Salvamos sempre positivo, o "type" dita o que é
+        type: toNumber(tx.TRNAMT) >= 0 ? 'CREDIT' : 'DEBIT',
+        amount: Math.abs(toNumber(tx.TRNAMT)), // Salvamos sempre positivo, o "type" dita o que é
         date: this.parseOfxDate(tx.DTPOSTED),
         description: tx.MEMO || tx.NAME || 'Transação sem descrição',
       }));

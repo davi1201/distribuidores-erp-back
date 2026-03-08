@@ -1,19 +1,22 @@
 import {
   Injectable,
   BadRequestException,
-  Logger,
   NotFoundException,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { clerkClient } from '@clerk/clerk-sdk-node';
 import Stripe from 'stripe';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class PaymentService {
   private stripe: Stripe;
-  private readonly logger = new Logger(PaymentService.name);
+  private readonly logger = createLogger(PaymentService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -39,7 +42,8 @@ export class PaymentService {
       where: { slug: planSlug },
     });
 
-    if (!plan) throw new NotFoundException('Plano não encontrado.');
+    if (!plan)
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PLAN));
 
     const isYearly = cycle === 'yearly';
     const priceId = isYearly

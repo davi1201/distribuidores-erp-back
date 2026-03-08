@@ -15,7 +15,7 @@ import {
   UpdateBankAccountDto,
 } from './dto/bank-account.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator'; // Ajuste o caminho para o seu decorator de usuário
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('bank-accounts')
 @UseGuards(ClerkAuthGuard) // Protege todas as rotas do controlador, ajuste para o guard que você utiliza

@@ -3,8 +3,8 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
-  Logger,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -13,7 +13,7 @@ import { AUDIT_KEY, AuditOptions } from './decorators/audit.decorator';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
-  private readonly logger = new Logger(AuditInterceptor.name);
+  private readonly logger = createLogger(AuditInterceptor.name);
 
   constructor(
     private readonly reflector: Reflector,

@@ -1,18 +1,22 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto } from './dto/create-sale.dto';
 import { FinancialService } from '../financial/financial.service';
 import { OrderStatus, Prisma } from '@prisma/client';
-import { CommissionsService } from 'src/commissions/commissions.service';
+import { CommissionsService } from '../commissions/commissions.service';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber, roundTo } from '../core/utils/number.utils';
 
 @Injectable()
 export class SalesService {
-  private readonly logger = new Logger(SalesService.name);
+  private readonly logger = createLogger(SalesService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -50,8 +54,8 @@ export class SalesService {
       // 2.2 Processa Split de Pagamentos e Taxas
       const baseOrderTotal =
         processedItems.subtotal +
-        Number(payload.shipping || 0) -
-        Number(payload.discount || 0);
+        toNumber(payload.shipping) -
+        toNumber(payload.discount);
       const processedPayments = await this.processPayments(
         tx,
         payload.payments,
@@ -71,8 +75,8 @@ export class SalesService {
           paymentTermId: payload.paymentTermId, // Mantido para legado
           status: finalStatus,
           subtotal: processedItems.subtotal,
-          discount: Number(payload.discount || 0),
-          shipping: Number(payload.shipping || 0),
+          discount: toNumber(payload.discount),
+          shipping: toNumber(payload.shipping),
           total: processedPayments.absoluteFinalTotal,
           totalIcms: processedItems.totalIcms,
           totalIpi: processedItems.totalIpi,
@@ -138,7 +142,9 @@ export class SalesService {
       );
     }
     if (!customer || customer.tenantId !== tenantId) {
-      throw new NotFoundException('Cliente não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CUSTOMER),
+      );
     }
     if (!customer.addresses[0]) {
       throw new BadRequestException(
@@ -170,7 +176,7 @@ export class SalesService {
       [];
 
     for (const item of items) {
-      const requestedQty = Number(item.quantity);
+      const requestedQty = toNumber(item.quantity);
       if (requestedQty <= 0) continue;
 
       const product = await tx.product.findUnique({
@@ -194,8 +200,10 @@ export class SalesService {
         context,
       );
 
-      const unitPrice = product.prices[0] ? Number(product.prices[0].price) : 0;
-      const unitDiscount = Number(item.discount || 0) / requestedQty;
+      const unitPrice = product.prices[0]
+        ? toNumber(product.prices[0].price)
+        : 0;
+      const unitDiscount = toNumber(item.discount) / requestedQty;
       const taxes = this.calculateTaxes(
         product,
         context.originState,
@@ -274,7 +282,7 @@ export class SalesService {
             },
           },
         });
-        sellerAvailable = stock ? Number(stock.quantity) : 0;
+        sellerAvailable = stock ? toNumber(stock.quantity) : 0;
       }
       if (sellerAvailable >= requestedQty) qtyFromSeller = requestedQty;
       else {
@@ -304,8 +312,8 @@ export class SalesService {
             r.originState === originState && r.destinationState === originState,
         );
       if (rule) {
-        icmsRate = Number(rule.icmsRate);
-        ipiRate = Number(rule.ipiRate);
+        icmsRate = toNumber(rule.icmsRate);
+        ipiRate = toNumber(rule.ipiRate);
       }
     }
     return { icmsRate, ipiRate };
@@ -323,7 +331,7 @@ export class SalesService {
 
     if (payments && Array.isArray(payments) && payments.length > 0) {
       const totalPaymentsSent = payments.reduce(
-        (acc, p) => acc + Number(p.amount),
+        (acc, p) => acc + toNumber(p.amount),
         0,
       );
       if (Math.abs(totalPaymentsSent - baseOrderTotal) > 0.02) {
@@ -345,18 +353,18 @@ export class SalesService {
         const calc = await this.financialService.calculateSaleTotal(
           tenantId,
           p.tenantPaymentMethodId,
-          Number(p.amount),
+          toNumber(p.amount),
           actualInstallments,
         );
 
-        const isFullPayment = Number(p.amount) === baseOrderTotal;
+        const isFullPayment = toNumber(p.amount) === baseOrderTotal;
         if (!isFullPayment && calc.discountApplied > 0) {
           this.logger.log(
             `Desconto removido: A venda foi dividida e o método exige pagamento integral.`,
           );
           calc.discountApplied = 0;
           // Reverte o total final: Valor original + Taxas de maquininha (se houver)
-          calc.finalTotal = Number(p.amount) + calc.feeValue;
+          calc.finalTotal = toNumber(p.amount) + calc.feeValue;
         }
 
         absoluteFinalTotal += calc.finalTotal;
@@ -365,7 +373,7 @@ export class SalesService {
           tenantId,
           tenantPaymentMethodId: p.tenantPaymentMethodId,
           paymentTermId: p.paymentTermId,
-          baseAmount: Number(p.amount),
+          baseAmount: toNumber(p.amount),
           installments: actualInstallments,
           discountApplied: calc.discountApplied,
           feeApplied: calc.feeValue,
@@ -397,7 +405,7 @@ export class SalesService {
           tenantId,
           userId,
           type: 'RECEIVABLE',
-          totalAmount: Number(op.finalAmount),
+          totalAmount: toNumber(op.finalAmount),
           docNumber: `${baseDocNumber}-${paymentIndex}`,
           descriptionPrefix: `Venda Pedido ${baseDocNumber}`,
           customerId: order.customerId,
@@ -417,7 +425,7 @@ export class SalesService {
         tenantId,
         userId,
         type: 'RECEIVABLE',
-        totalAmount: Number(order.total),
+        totalAmount: toNumber(order.total),
         docNumber: baseDocNumber,
         descriptionPrefix: 'Venda Pedido',
         customerId: order.customerId,
@@ -539,15 +547,15 @@ export class SalesService {
       if (!groupedItemsMap.has(item.productId)) {
         groupedItemsMap.set(item.productId, {
           ...item,
-          quantity: Number(item.quantity),
-          totalPrice: Number(item.totalPrice),
-          discount: Number(item.discount),
+          quantity: toNumber(item.quantity),
+          totalPrice: toNumber(item.totalPrice),
+          discount: toNumber(item.discount),
         });
       } else {
         const existing = groupedItemsMap.get(item.productId);
-        existing.quantity += Number(item.quantity);
-        existing.totalPrice += Number(item.totalPrice);
-        existing.discount += Number(item.discount);
+        existing.quantity += toNumber(item.quantity);
+        existing.totalPrice += toNumber(item.totalPrice);
+        existing.discount += toNumber(item.discount);
       }
     }
 
@@ -597,14 +605,14 @@ export class SalesService {
     });
 
     if (!order || order.tenantId !== tenantId)
-      throw new NotFoundException('Pedido não encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.ORDER));
     return order;
   }
 
   async updateStatus(id: string, tenantId: string, newStatus: OrderStatus) {
     const order = await this.prisma.order.findUnique({ where: { id } });
     if (!order || order.tenantId !== tenantId)
-      throw new NotFoundException('Pedido não encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.ORDER));
     return this.prisma.order.update({
       where: { id },
       data: { status: newStatus },
@@ -616,7 +624,7 @@ export class SalesService {
       where: { id: orderId },
     });
     if (!order || order.tenantId !== tenantId)
-      throw new NotFoundException('Pedido não encontrado');
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.ORDER));
     await this.commissionsService.calculateAndRegister(order.id, tenantId);
   }
 }

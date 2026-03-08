@@ -12,7 +12,7 @@ import { PaymentService } from './payment.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // Ou ClerkAuthGuard
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Request } from 'express';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('payment')
 export class PaymentController {

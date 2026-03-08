@@ -1,21 +1,27 @@
 import {
   BadRequestException,
   Injectable,
-  Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { createLogger } from '../core/logging';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CommissionStatus,
   CommissionType,
   CommissionScope,
 } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library'; // Importante para precisão
+import { Decimal } from '@prisma/client/runtime/library';
+
+// DTOs
 import { CreatePayoutDto } from './dto/create-payout.dto';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber, toDecimal, roundTo } from '../core/utils/number.utils';
 
 @Injectable()
 export class CommissionsService {
-  private readonly logger = new Logger(CommissionsService.name);
+  private readonly logger = createLogger(CommissionsService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -35,7 +41,9 @@ export class CommissionsService {
       },
     });
 
-    if (!order) throw new NotFoundException('Pedido não encontrado.');
+    if (!order) {
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.ORDER));
+    }
     if (!order.sellerId) {
       this.logger.warn(
         `Pedido ${orderId} sem vendedor vinculado. Comissão ignorada.`,
@@ -74,7 +82,7 @@ export class CommissionsService {
         const commissionValue = this.calculateRuleValue(
           rule,
           finalItemBase,
-          Number(item.quantity),
+          toNumber(item.quantity),
         );
         totalRawCommission = totalRawCommission.add(commissionValue);
       }
@@ -134,7 +142,7 @@ export class CommissionsService {
     });
 
     this.logger.log(
-      `Comissão registrada: R$ ${finalCommission.toFixed(2)} (Base: ${finalBaseValue.toFixed(2)}) para Seller ${order.sellerId}`,
+      `Comissão registrada: R$ ${roundTo(toNumber(finalCommission), 2)} (Base: ${roundTo(toNumber(finalBaseValue), 2)}) para Seller ${order.sellerId}`,
     );
     return record;
   }
@@ -388,10 +396,12 @@ export class CommissionsService {
     });
   }
 
-  // src/commissions/commissions.service.ts
-
+  /**
+   * Busca comissões aprovadas agrupadas por vendedor, prontas para pagamento.
+   * Otimizado para evitar N+1 queries - usa apenas 3 queries no total.
+   */
   async getReadyToPay(tenantId: string) {
-    // 1. Agrupa comissões aprovadas por vendedor (Query Leve)
+    // 1. Agrupa comissões aprovadas por vendedor
     const groupedCommissions = await this.prisma.commissionRecord.groupBy({
       by: ['sellerId'],
       where: {
@@ -402,38 +412,49 @@ export class CommissionsService {
       _count: { id: true },
     });
 
-    // 2. Enriquece os dados (Nome do Vendedor + Lista de IDs)
-    // Usamos Promise.all para buscar os dados de todos os vendedores em paralelo
-    const result = await Promise.all(
-      groupedCommissions.map(async (group) => {
-        // Busca dados do vendedor
-        const seller = await this.prisma.user.findUnique({
-          where: { id: group.sellerId },
-          select: { name: true, email: true },
-        });
+    if (groupedCommissions.length === 0) {
+      return [];
+    }
 
-        // Busca os IDs individuais (necessário para o payload de baixa)
-        const records = await this.prisma.commissionRecord.findMany({
-          where: {
-            tenantId,
-            sellerId: group.sellerId,
-            status: CommissionStatus.APPROVED,
-          },
-          select: { id: true },
-        });
-
-        return {
-          sellerId: group.sellerId,
-          sellerName: seller?.name || 'Vendedor Desconhecido',
-          sellerEmail: seller?.email,
-          totalAmount: group._sum.commissionAmount,
-          count: group._count.id,
-          commissionIds: records.map((r) => r.id), // Lista pronta para ser enviada no createPayout
-        };
+    // 2. Busca todos os vendedores em uma única query (evita N+1)
+    const sellerIds = groupedCommissions.map((g) => g.sellerId);
+    const [sellers, allRecords] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: sellerIds } },
+        select: { id: true, name: true, email: true },
       }),
-    );
+      // 3. Busca todos os IDs de comissões em uma única query (evita N+1)
+      this.prisma.commissionRecord.findMany({
+        where: {
+          tenantId,
+          sellerId: { in: sellerIds },
+          status: CommissionStatus.APPROVED,
+        },
+        select: { id: true, sellerId: true },
+      }),
+    ]);
 
-    return result;
+    // Cria mapas para lookup O(1)
+    const sellerMap = new Map(sellers.map((s) => [s.id, s]));
+    const recordsBySeller = new Map<string, string[]>();
+    for (const record of allRecords) {
+      const existing = recordsBySeller.get(record.sellerId) || [];
+      existing.push(record.id);
+      recordsBySeller.set(record.sellerId, existing);
+    }
+
+    // 4. Combina os dados em memória
+    return groupedCommissions.map((group) => {
+      const seller = sellerMap.get(group.sellerId);
+      return {
+        sellerId: group.sellerId,
+        sellerName: seller?.name || 'Vendedor Desconhecido',
+        sellerEmail: seller?.email,
+        totalAmount: group._sum.commissionAmount,
+        count: group._count.id,
+        commissionIds: recordsBySeller.get(group.sellerId) || [],
+      };
+    });
   }
 
   async getCommissionsPendingApproval(tenantId: string) {

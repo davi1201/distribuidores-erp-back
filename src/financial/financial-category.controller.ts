@@ -14,9 +14,9 @@ import {
   CreateCategoryDto,
   UpdateCategoryDto,
 } from './dto/financial-category.dto';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator'; // Ajuste o caminho
+import { CurrentUser } from '../auth/decorators/current-user.decorator'; // Ajuste o caminho
 import { CategoryType } from '@prisma/client';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('categories') // A rota final será /categories
 @UseGuards(ClerkAuthGuard) // Protege todas as rotas do controlador

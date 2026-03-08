@@ -1,10 +1,14 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentTermDto } from './dto/create-payment-term.dto';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class PaymentTermsService {
@@ -85,8 +89,11 @@ export class PaymentTermsService {
       include: { allowedMethods: true },
     });
 
-    if (!term || term.tenantId !== tenantId)
-      throw new NotFoundException('Condição de pagamento não encontrada');
+    if (!term || term.tenantId !== tenantId) {
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PAYMENT_TERM),
+      );
+    }
 
     return term; // ✅ Objeto limpo e tipado
   }

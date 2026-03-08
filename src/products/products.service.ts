@@ -3,8 +3,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { customAlphabet } from 'nanoid';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateProductDto,
   CreateProductBatchDto,
@@ -13,10 +14,19 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { User } from '@prisma/client';
 import { CalculatePriceDto } from './dto/calculate-price.dto';
 
-const generateSku = customAlphabet('123456789ABCDEFGHJKLMNPQRSTUVWXYZ', 8);
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES, SYSTEM_LIMITS } from '../core/constants';
+import { toNumber, roundTo } from '../core/utils/number.utils';
+
+const generateSku = customAlphabet(
+  '123456789ABCDEFGHJKLMNPQRSTUVWXYZ',
+  SYSTEM_LIMITS.SKU_LENGTH,
+);
 
 @Injectable()
 export class ProductsService {
+  private readonly logger = createLogger(ProductsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   // ===========================================================================
@@ -51,7 +61,7 @@ export class ProductsService {
             ncm: parentData.ncm,
             cest: parentData.cest || '',
             cfop: parentData.cfop || '',
-            origin: Number(parentData.origin || 0),
+            origin: toNumber(parentData.origin),
             taxProfileId: parentData.taxProfileId || null,
             unit: 'UN',
             isActive: true,
@@ -134,7 +144,9 @@ export class ProductsService {
       });
 
       if (!existingParent || existingParent.tenantId !== tenantId) {
-        throw new NotFoundException('Produto não encontrado.');
+        throw new NotFoundException(
+          ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PRODUCT),
+        );
       }
 
       // Atualiza PAI (Dados gerais)
@@ -148,7 +160,7 @@ export class ProductsService {
             ncm: parentData.ncm,
             cest: parentData.cest || '',
             cfop: parentData.cfop || '',
-            origin: Number(parentData.origin || 0),
+            origin: toNumber(parentData.origin),
             taxProfileId: parentData.taxProfileId || null,
           },
         });
@@ -241,7 +253,9 @@ export class ProductsService {
     });
 
     if (!product || product.tenantId !== tenantId) {
-      throw new NotFoundException('Produto não encontrado');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PRODUCT),
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -299,11 +313,11 @@ export class ProductsService {
         ncm: data.ncm || '',
         cest: data.cest || '',
         cfop: data.cfop || '',
-        origin: Number(data.origin || 0),
+        origin: toNumber(data.origin),
         taxProfileId: data.taxProfileId || null,
-        costPrice: Number(data.costPrice || 0),
-        expenses: Number(data.expenses || 0),
-        markup: Number(data.markup || 0),
+        costPrice: toNumber(data.costPrice),
+        expenses: toNumber(data.expenses),
+        markup: toNumber(data.markup),
         isActive: true,
       },
     });
@@ -358,11 +372,11 @@ export class ProductsService {
       ncm: data.ncm || '',
       cest: data.cest || '',
       cfop: data.cfop || '',
-      origin: Number(data.origin || 0),
+      origin: toNumber(data.origin),
       taxProfileId: data.taxProfileId || null,
-      costPrice: data.costPrice ? Number(data.costPrice) : undefined,
-      expenses: data.expenses ? Number(data.expenses) : undefined,
-      markup: data.markup ? Number(data.markup) : undefined,
+      costPrice: data.costPrice ? toNumber(data.costPrice) : undefined,
+      expenses: data.expenses ? toNumber(data.expenses) : undefined,
+      markup: data.markup ? toNumber(data.markup) : undefined,
     };
 
     if (data.sku) {
@@ -441,7 +455,7 @@ export class ProductsService {
     if (!stockData && !isCreation) return;
 
     const targetWarehouseId = stockData?.warehouseId || defaultWarehouseId;
-    const initialQty = Number(stockData?.quantity || 0);
+    const initialQty = toNumber(stockData?.quantity);
 
     if (isCreation) {
       await tx.stockItem.create({
@@ -449,8 +463,8 @@ export class ProductsService {
           productId,
           warehouseId: targetWarehouseId,
           quantity: initialQty,
-          minStock: Number(stockData?.minStock || 0),
-          maxStock: Number(stockData?.maxStock || 0),
+          minStock: toNumber(stockData?.minStock),
+          maxStock: toNumber(stockData?.maxStock),
         },
       });
 
@@ -480,8 +494,8 @@ export class ProductsService {
         await tx.stockItem.update({
           where: { id: existingStock.id },
           data: {
-            minStock: Number(stockData.minStock || 0),
-            maxStock: Number(stockData.maxStock || 0),
+            minStock: toNumber(stockData.minStock),
+            maxStock: toNumber(stockData.maxStock),
           },
         });
       } else {
@@ -490,8 +504,8 @@ export class ProductsService {
             productId,
             warehouseId: targetWarehouseId,
             quantity: 0,
-            minStock: Number(stockData.minStock || 0),
-            maxStock: Number(stockData.maxStock || 0),
+            minStock: toNumber(stockData.minStock),
+            maxStock: toNumber(stockData.maxStock),
           },
         });
       }
@@ -509,7 +523,7 @@ export class ProductsService {
     if (!prices || prices.length === 0) return;
 
     for (const p of prices) {
-      const newPriceVal = Number(p.price);
+      const newPriceVal = toNumber(p.price);
 
       const currentPriceObj = await tx.productPrice.findUnique({
         where: {
@@ -517,7 +531,7 @@ export class ProductsService {
         },
       });
       const currentPriceVal = currentPriceObj
-        ? Number(currentPriceObj.price)
+        ? toNumber(currentPriceObj.price)
         : 0;
 
       if (currentPriceVal !== newPriceVal || !currentPriceObj) {
@@ -561,7 +575,7 @@ export class ProductsService {
     }
 
     if (supplierData && supplierData.supplierId) {
-      const lastPrice = Number(supplierData.lastPrice || defaultCost);
+      const lastPrice = toNumber(supplierData.lastPrice) || defaultCost;
 
       await tx.productSupplier.upsert({
         where: { productId },
@@ -649,7 +663,9 @@ export class ProductsService {
     });
 
     if (!product || product.tenantId !== tenantId) {
-      throw new NotFoundException('Produto não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PRODUCT),
+      );
     }
 
     const stockItem = product.stock?.[0] || {
@@ -699,11 +715,14 @@ export class ProductsService {
       if (p.variants.length > 0) {
         totalStock = p.variants.reduce(
           (accV, v) =>
-            accV + v.stock.reduce((accS, s) => accS + Number(s.quantity), 0),
+            accV + v.stock.reduce((accS, s) => accS + toNumber(s.quantity), 0),
           0,
         );
       } else {
-        totalStock = p.stock.reduce((accS, s) => accS + Number(s.quantity), 0);
+        totalStock = p.stock.reduce(
+          (accS, s) => accS + toNumber(s.quantity),
+          0,
+        );
       }
 
       const supplierInfo = p.supplier
@@ -711,15 +730,15 @@ export class ProductsService {
             id: p.supplier.supplierId,
             name: p.supplier.supplier.name,
             productCode: p.supplier.supplierProductCode,
-            contractCost: canViewCost ? Number(p.supplier.lastPrice) : 0,
+            contractCost: canViewCost ? toNumber(p.supplier.lastPrice) : 0,
           }
         : p.variants[0]?.supplier?.supplier;
 
       const salePrices = p.prices.map((pr) => ({
         listId: pr.priceListId,
         listName: pr.priceList.name,
-        price: Number(pr.price),
-        adjustment: Number(pr.priceList.percentageAdjustment || 0),
+        price: toNumber(pr.price),
+        adjustment: toNumber(pr.priceList.percentageAdjustment),
       }));
 
       return {
@@ -735,12 +754,12 @@ export class ProductsService {
           total: totalStock,
           locations: p.stock.map((s) => ({
             warehouse: s.warehouse.name,
-            qty: Number(s.quantity),
+            qty: toNumber(s.quantity),
           })),
         },
         financial: {
-          baseCost: canViewCost ? Number(p.costPrice) : 0,
-          markup: Number(p.markup),
+          baseCost: canViewCost ? toNumber(p.costPrice) : 0,
+          markup: toNumber(p.markup),
         },
         prices: salePrices,
         supplier: supplierInfo,
@@ -754,12 +773,12 @@ export class ProductsService {
           priceSales: v.prices.map((pr) => ({
             listId: pr.priceListId,
             listName: pr.priceList.name,
-            price: Number(pr.price),
-            priceCost: canViewCost ? Number(v.costPrice) : 0,
-            adjustment: Number(pr.priceList.percentageAdjustment || 0),
+            price: toNumber(pr.price),
+            priceCost: canViewCost ? toNumber(v.costPrice) : 0,
+            adjustment: toNumber(pr.priceList.percentageAdjustment),
           })),
           imageUrl: v.images[0]?.url || null,
-          stock: v.stock.reduce((a, b) => a + Number(b.quantity), 0),
+          stock: v.stock.reduce((a, b) => a + toNumber(b.quantity), 0),
         })),
       };
     });
@@ -813,7 +832,7 @@ export class ProductsService {
         const matrixEntry = product.stock.find(
           (s) => s.warehouseId === defaultWarehouseId,
         );
-        stockInMatrix = Number(matrixEntry?.quantity || 0);
+        stockInMatrix = toNumber(matrixEntry?.quantity);
       }
 
       if (user.role === 'SELLER') {
@@ -821,13 +840,13 @@ export class ProductsService {
           const sellerEntry = product.stock.find(
             (s) => s.warehouseId === sellerWarehouseId,
           );
-          totalStock = Number(sellerEntry?.quantity || 0);
+          totalStock = toNumber(sellerEntry?.quantity);
         } else {
           totalStock = 0;
         }
       } else {
         totalStock = product.stock.reduce(
-          (acc, s) => acc + Number(s.quantity),
+          (acc, s) => acc + toNumber(s.quantity),
           0,
         );
       }
@@ -846,9 +865,9 @@ export class ProductsService {
 
   async calculatePricing(dto: CalculatePriceDto, tenantId: string) {
     const { costPrice, expenses, markup, taxProfileId, destinationState } = dto;
-    const cost = Number(costPrice);
-    const expensesPct = Number(expenses);
-    const markupPct = Number(markup);
+    const cost = toNumber(costPrice);
+    const expensesPct = toNumber(expenses);
+    const markupPct = toNumber(markup);
 
     let icmsRate = 0,
       pisRate = 0,
@@ -872,10 +891,10 @@ export class ProductsService {
             profile.rules[0];
         }
         if (rule) {
-          icmsRate = Number(rule.icmsRate);
-          pisRate = Number(rule.pisRate);
-          cofinsRate = Number(rule.cofinsRate);
-          ipiRate = Number(rule.ipiRate);
+          icmsRate = toNumber(rule.icmsRate);
+          pisRate = toNumber(rule.pisRate);
+          cofinsRate = toNumber(rule.cofinsRate);
+          ipiRate = toNumber(rule.ipiRate);
           activeRuleName = `${rule.originState} ➝ ${rule.destinationState}`;
         }
       }

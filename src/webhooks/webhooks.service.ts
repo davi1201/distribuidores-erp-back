@@ -1,10 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { Injectable } from '@nestjs/common';
+import { createLogger } from '../core/logging';
+import { PrismaService } from '../prisma/prisma.service';
 import { addDays } from 'date-fns';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class WebhooksService {
-  private readonly logger = new Logger(WebhooksService.name);
+  private readonly logger = createLogger(WebhooksService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -124,12 +128,12 @@ export class WebhooksService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { clerkId: clerkOrgId },
     });
-    if (!tenant) throw new Error(`Tenant não encontrado`); // Clerk vai retentar
+    if (!tenant) throw new Error(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.TENANT)); // Clerk vai retentar
 
     const user = await this.prisma.user.findUnique({
       where: { clerkId: clerkUserId },
     });
-    if (!user) throw new Error(`Usuário não encontrado`); // Clerk vai retentar
+    if (!user) throw new Error(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.USER)); // Clerk vai retentar
 
     // Trava contra sequestro de Tenant
     if (user.tenantId && user.tenantId !== tenant.id) {

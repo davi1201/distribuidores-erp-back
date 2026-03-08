@@ -4,22 +4,23 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CategoryDto } from './dto/category.dto';
 import { Role, User } from '@prisma/client';
-import { LocationsService } from 'src/locations/locations.service';
+import { LocationsService } from '../locations/locations.service';
+import { FindCustomersFilters } from './interfaces/customer.interfaces';
 
-export interface FindCustomersFilters {
-  name?: string;
-  document?: string;
-  state?: string;
-  city?: string;
-}
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class CustomersService {
+  private readonly logger = createLogger(CustomersService.name);
+
   constructor(
     private prisma: PrismaService,
     private locationsService: LocationsService,
@@ -81,7 +82,7 @@ export class CustomersService {
           // Vínculos
           sellerId: row.sellerId, // A função create vai validar se pode usar isso
           priceListId: row.priceListId,
-          creditLimit: row.creditLimit ? Number(row.creditLimit) : 0,
+          creditLimit: row.creditLimit ? toNumber(row.creditLimit) : 0,
           // Monta o endereço se houver dados
           addresses: city
             ? [
@@ -184,12 +185,12 @@ export class CustomersService {
 
               // 👇 Ajustado para ler addr.city
               city: addr.city
-                ? { connect: { id: Number(addr.city) } }
+                ? { connect: { id: toNumber(addr.city) } }
                 : undefined,
 
               // 👇 Ajustado para ler addr.state
               state: addr.state
-                ? { connect: { id: Number(addr.state) } }
+                ? { connect: { id: toNumber(addr.state) } }
                 : undefined,
 
               category: addr.categoryId
@@ -243,8 +244,8 @@ export class CustomersService {
       whereCondition.addresses = {
         some: {
           // Converte para Number, já que no erro anterior vimos que a sua API retorna os IDs como números
-          ...(filters.state && { stateId: Number(filters.state) }),
-          ...(filters.city && { cityId: Number(filters.city) }),
+          ...(filters.state && { stateId: toNumber(filters.state) }),
+          ...(filters.city && { cityId: toNumber(filters.city) }),
         },
       };
     }
@@ -270,7 +271,9 @@ export class CustomersService {
     });
 
     if (!customer || customer.tenantId !== tenantId) {
-      throw new NotFoundException('Cliente não encontrado');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CUSTOMER),
+      );
     }
     return customer;
   }
@@ -286,7 +289,9 @@ export class CustomersService {
     });
 
     if (!customer || customer.tenantId !== tenantId) {
-      throw new NotFoundException('Cliente não encontrado');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CUSTOMER),
+      );
     }
 
     // Separa os relacionamentos do resto dos dados
@@ -333,9 +338,9 @@ export class CustomersService {
             ibgeCode: String(a.ibgeCode || ''),
 
             // 👇 Correção: Usando 'connect' para relações
-            city: a.city ? { connect: { id: Number(a.city) } } : undefined,
+            city: a.city ? { connect: { id: toNumber(a.city) } } : undefined,
 
-            state: a.state ? { connect: { id: Number(a.state) } } : undefined,
+            state: a.state ? { connect: { id: toNumber(a.state) } } : undefined,
 
             category: a.categoryId
               ? { connect: { id: a.categoryId } }
@@ -368,7 +373,9 @@ export class CustomersService {
     });
 
     if (!customer || customer.tenantId !== tenantId) {
-      throw new NotFoundException('Cliente não encontrado');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CUSTOMER),
+      );
     }
 
     return this.prisma.customer.delete({
@@ -403,7 +410,9 @@ export class CustomersService {
     });
 
     if (!category || category.tenantId !== tenantId) {
-      throw new NotFoundException('Categoria de cliente não encontrada');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CATEGORY),
+      );
     }
 
     return this.prisma.customerCategory.update({
@@ -418,7 +427,9 @@ export class CustomersService {
     });
 
     if (!category || category.tenantId !== tenantId) {
-      throw new NotFoundException('Categoria não encontrada');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CATEGORY),
+      );
     }
 
     return this.prisma.customerCategory.delete({ where: { id, tenantId } });
@@ -451,7 +462,9 @@ export class CustomersService {
     });
 
     if (!category || category.tenantId !== tenantId) {
-      throw new NotFoundException('Categoria de endereço não encontrada');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CATEGORY),
+      );
     }
 
     return this.prisma.addressCategory.update({
@@ -466,7 +479,9 @@ export class CustomersService {
     });
 
     if (!category || category.tenantId !== tenantId) {
-      throw new NotFoundException('Categoria não encontrada');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CATEGORY),
+      );
     }
 
     if (category.isSystemDefault) {

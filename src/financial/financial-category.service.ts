@@ -10,6 +10,9 @@ import {
 } from './dto/financial-category.dto';
 import { CategoryType } from '@prisma/client';
 
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+
 @Injectable()
 export class FinancialCategoryService {
   constructor(private prisma: PrismaService) {}
@@ -44,7 +47,9 @@ export class FinancialCategoryService {
     });
 
     if (!category || category.tenantId !== tenantId) {
-      throw new NotFoundException('Categoria não encontrada.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.CATEGORY),
+      );
     }
 
     return category;

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CacheService, CacheKeys } from '../infrastructure/cache/cache.service';
 
 interface CityResolveDto {
   ibgeCode?: string;
@@ -9,19 +10,48 @@ interface CityResolveDto {
 
 @Injectable()
 export class LocationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cache: CacheService,
+  ) {}
 
+  /**
+   * Busca todos os estados com cache de 24h
+   */
   async findAllStates() {
-    return this.prisma.state.findMany({
-      orderBy: { name: 'asc' },
-    });
+    return this.cache.getOrSet(
+      CacheKeys.states(),
+      () =>
+        this.prisma.state.findMany({
+          orderBy: { name: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            uf: true,
+          },
+        }),
+      CacheService.TTL.LOCATIONS,
+    );
   }
 
+  /**
+   * Busca cidades por estado com cache de 24h
+   */
   async findCitiesByState(id: number) {
-    return this.prisma.city.findMany({
-      where: { state: { id } },
-      orderBy: { name: 'asc' },
-    });
+    return this.cache.getOrSet(
+      CacheKeys.citiesByState(id),
+      () =>
+        this.prisma.city.findMany({
+          where: { state: { id } },
+          orderBy: { name: 'asc' },
+          select: {
+            id: true,
+            name: true,
+            ibgeCode: true,
+          },
+        }),
+      CacheService.TTL.LOCATIONS,
+    );
   }
 
   async findCityForImport(dto: CityResolveDto) {

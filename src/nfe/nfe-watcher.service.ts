@@ -1,14 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import * as imap from 'imap-simple';
 import { simpleParser } from 'mailparser';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { XMLParser } from 'fast-xml-parser';
-import { NotificationsService } from 'src/notifications/notifications.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class MailWatcherService {
-  private readonly logger = new Logger(MailWatcherService.name);
+  private readonly logger = createLogger(MailWatcherService.name);
 
   constructor(
     private readonly prisma: PrismaService,

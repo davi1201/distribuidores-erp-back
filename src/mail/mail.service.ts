@@ -1,10 +1,12 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import * as nodemailer from 'nodemailer';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class MailService implements OnModuleInit {
   private transporter: nodemailer.Transporter;
-  private readonly logger = new Logger(MailService.name);
+  private readonly logger = createLogger(MailService.name);
 
   // É executado automaticamente quando o NestJS sobe
   async onModuleInit() {
@@ -29,7 +31,7 @@ export class MailService implements OnModuleInit {
       // Modo Produção: Lê as credenciais do seu arquivo .env
       this.transporter = nodemailer.createTransport({
         host: process.env.MAIL_HOST,
-        port: Number(process.env.MAIL_PORT),
+        port: toNumber(process.env.MAIL_PORT),
         secure: process.env.MAIL_SECURE === 'true', // true para porta 465, false para outras
         auth: {
           user: process.env.MAIL_USER,

@@ -1,9 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service'; // Ajuste o caminho conforme seu projeto
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateBankAccountDto,
   UpdateBankAccountDto,
 } from './dto/bank-account.dto';
+
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
 
 @Injectable()
 export class BankAccountsService {
@@ -35,7 +38,9 @@ export class BankAccountsService {
     });
 
     if (!bankAccount || bankAccount.tenantId !== tenantId) {
-      throw new NotFoundException('Conta bancária não encontrada.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.BANK_ACCOUNT),
+      );
     }
 
     return bankAccount;

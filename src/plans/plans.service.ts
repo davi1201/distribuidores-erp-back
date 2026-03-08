@@ -3,6 +3,9 @@ import { CreatePlanDto } from './dto/create-plan.dto';
 import { UpdatePlanDto } from './dto/update-plan.dto';
 import { PrismaService } from '../prisma/prisma.service';
 
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+
 @Injectable()
 export class PlansService {
   constructor(private readonly prisma: PrismaService) {}
@@ -52,7 +55,7 @@ export class PlansService {
     });
 
     if (!plan) {
-      throw new NotFoundException(`Plano com ID ${id} não encontrado.`);
+      throw new NotFoundException(ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PLAN));
     }
 
     return this.prisma.plan.update({

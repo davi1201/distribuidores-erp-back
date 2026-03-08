@@ -5,14 +5,14 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
-  Logger,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Controller('webhooks/asaas')
 export class AsaasWebhookController {
-  private readonly logger = new Logger(AsaasWebhookController.name);
+  private readonly logger = createLogger(AsaasWebhookController.name);
 
   constructor(
     private eventEmitter: EventEmitter2,

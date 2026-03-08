@@ -13,7 +13,7 @@ import { CreateTaxProfileDto } from './dto/create-tax-profile.dto';
 import { UpdateTaxProfileDto } from './dto/update-tax-profile.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 
 @Controller('tax-profiles')
 @UseGuards(ClerkAuthGuard)

@@ -12,10 +12,10 @@ import {
 } from '@nestjs/common';
 import { CommissionsService } from './commissions.service';
 import { CreateCommissionRuleDto } from './dto/create-rule.dto';
-import { ClerkAuthGuard } from 'src/auth/guards/clerk-auth.guard';
-import { Roles } from 'src/auth/decorators/roles.decorator';
+import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 // Importe seus Guards de Autenticação e Role
 // import { AuthGuard } from '@/auth/auth.guard';
 // import { RolesGuard } from '@/auth/roles.guard';

@@ -5,21 +5,14 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { MatchingEngineService } from './matching-engine.service';
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { FinancialService } from '../financial/financial.service';
 import { OfxParserService } from './ofx-parser.service';
-
-// Tipagens de exemplo (O ideal é criar classes DTO separadas com class-validator)
-export interface CreateBankAccountDto {
-  name: string;
-  agency?: string;
-  accountNumber?: string;
-  initialBalance?: number;
-}
-
-export interface UpdateBankAccountDto extends Partial<CreateBankAccountDto> {
-  isActive?: boolean;
-}
+import {
+  CreateBankAccountDto,
+  UpdateBankAccountDto,
+} from './interfaces/bank-reconciliation.interfaces';
+import { toNumber } from '../core/utils';
 
 @Injectable()
 export class BankReconciliationService {
@@ -83,7 +76,7 @@ export class BankReconciliationService {
 
     const paymentDto = {
       titleId: financialTitleId,
-      amount: Number(bankTx.amount),
+      amount: toNumber(bankTx.amount),
       paymentDate: bankTx.date,
       bankAccountId: bankTx.bankAccountId,
       observation: `Baixa via Conciliação (OFX): ${bankTx.description}`,

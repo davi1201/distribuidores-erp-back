@@ -3,14 +3,14 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
-  Logger,
 } from '@nestjs/common';
+import { createLogger } from '../../core/logging';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class BillingGuard implements CanActivate {
-  private readonly logger = new Logger(BillingGuard.name);
+  private readonly logger = createLogger(BillingGuard.name);
 
   constructor(
     private prisma: PrismaService,

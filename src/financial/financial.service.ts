@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { createLogger } from '../core/logging';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   User,
@@ -14,45 +15,27 @@ import {
   TitleStatus,
 } from '@prisma/client';
 import { addDays, addMonths } from 'date-fns';
+
+// DTOs e Interfaces
 import { CreateTitleDto } from './dto/create-title.dto';
 import { RegisterPaymentDto } from './dto/register-payment.dto';
+import {
+  InstallmentRule,
+  GenerateTitlesConfig,
+} from './interfaces/financial.interfaces';
 
-const generateDocNumber = (doc: string | number) => {
-  const num = Number(doc);
-  if (isNaN(num)) return String(doc);
-  return String(num).padStart(4, '0');
-};
-
-export interface InstallmentRule {
-  days: number;
-  percent?: number;
-  fixedAmount?: number;
-}
-
-export interface GenerateTitlesConfig {
-  tenantId: string;
-  userId: string;
-  type: TitleType;
-  totalAmount: number;
-  docNumber: string;
-  descriptionPrefix: string;
-  customerId?: string;
-  supplierId?: string;
-  orderId?: string;
-  orderPaymentId?: string;
-  importId?: string;
-  paymentTermId?: string;
-  installmentsPlan?: InstallmentRule[];
-  installmentCount?: number;
-  startDate?: Date | string;
-  tenantPaymentMethodId?: string;
-  categoryId?: string;
-  status?: TitleStatus;
-  tx?: Prisma.TransactionClient; // 🔥 Opcional para não quebrar chamadas avulsas
-}
+// Core imports
+import { ERROR_MESSAGES, ENTITY_NAMES } from '../core/constants';
+import {
+  generateDocNumber,
+  roundTo,
+  toNumber,
+} from '../core/utils/number.utils';
 
 @Injectable()
 export class FinancialService {
+  private readonly logger = createLogger(FinancialService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   // ==========================================================================
@@ -75,14 +58,16 @@ export class FinancialService {
     });
 
     if (!method || method.tenantId !== tenantId) {
-      throw new NotFoundException('Método de pagamento não encontrado.');
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PAYMENT_METHOD),
+      );
     }
 
     let finalTotal = baseTotal;
     let discountValue = 0;
 
-    if (Number(method.discountPercentage) > 0) {
-      discountValue = baseTotal * (Number(method.discountPercentage) / 100);
+    if (toNumber(method.discountPercentage) > 0) {
+      discountValue = baseTotal * (toNumber(method.discountPercentage) / 100);
       finalTotal = baseTotal - discountValue;
     }
 
@@ -92,7 +77,7 @@ export class FinancialService {
       method.passFeeToCustomer &&
       method.installments.length > 0
     ) {
-      const feePercentage = Number(method.installments[0].feePercentage);
+      const feePercentage = toNumber(method.installments[0].feePercentage);
       const divisor = (100 - feePercentage) / 100;
       const totalWithFee = divisor > 0 ? finalTotal / divisor : finalTotal;
       feeValue = totalWithFee - finalTotal;
@@ -269,9 +254,9 @@ export class FinancialService {
         const dbRules = term.rules as any;
         if (Array.isArray(dbRules) && dbRules.length > 0) {
           plan = dbRules.map((r: any) => ({
-            days: Number(r.days),
-            percent: Number(r.percent),
-            fixedAmount: r.fixedAmount ? Number(r.fixedAmount) : undefined,
+            days: toNumber(r.days),
+            percent: toNumber(r.percent),
+            fixedAmount: r.fixedAmount ? toNumber(r.fixedAmount) : undefined,
           }));
         }
       }
@@ -312,14 +297,10 @@ export class FinancialService {
       const isLast = i === plan.length - 1;
 
       let amount = rule.fixedAmount
-        ? Number(rule.fixedAmount)
-        : Number(
-            ((totalAmount * (rule.percent || 100 / plan.length)) / 100).toFixed(
-              2,
-            ),
-          );
+        ? toNumber(rule.fixedAmount)
+        : roundTo((totalAmount * (rule.percent || 100 / plan.length)) / 100, 2);
 
-      if (isLast) amount = Number(remainingBalance.toFixed(2));
+      if (isLast) amount = roundTo(remainingBalance, 2);
       remainingBalance -= amount;
 
       if (amount <= 0 && remainingBalance <= 0 && plan.length > 1) continue;
@@ -379,20 +360,20 @@ export class FinancialService {
 
         if (!initialTitle || initialTitle.tenantId !== tenantId) {
           throw new NotFoundException(
-            `Título ${payment.titleId} não encontrado.`,
+            ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.FINANCIAL_TITLE),
           );
         }
 
         const titlesToProcess = await this.resolveTitlesToProcess(
           initialTitle,
-          Number(payment.amount),
+          toNumber(payment.amount),
           tx,
         );
-        let remainingMoney = Number(payment.amount);
+        let remainingMoney = toNumber(payment.amount);
 
         for (const title of titlesToProcess) {
           if (remainingMoney <= 0) break;
-          const currentBalance = Number(title.balance);
+          const currentBalance = toNumber(title.balance);
           const amountToPay = Math.min(currentBalance, remainingMoney);
           if (amountToPay <= 0) continue;
 
@@ -479,7 +460,7 @@ export class FinancialService {
     if (
       initialTitle.type === TitleType.RECEIVABLE &&
       initialTitle.customerId &&
-      amountPaid > Number(initialTitle.balance)
+      amountPaid > toNumber(initialTitle.balance)
     ) {
       const nextTitles = await dbClient.financialTitle.findMany({
         where: {

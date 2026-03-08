@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { ValidationPipe } from '@nestjs/common';
 import cookieParser from 'cookie-parser';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
+import helmet from 'helmet';
 
 const server = express();
 let isAppInitialized = false; // Flag para evitar reinicialização no Vercel (Cold Starts)
@@ -14,6 +16,21 @@ export async function bootstrapApp() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server), {
     rawBody: true,
   });
+
+  // Security middleware
+  app.use(helmet());
+
+  // Global validation pipe for DTOs
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // Remove propriedades não declaradas no DTO
+      forbidNonWhitelisted: true, // Retorna erro se enviar propriedades não permitidas
+      transform: true, // Transforma automaticamente os tipos (query params, etc)
+      transformOptions: {
+        enableImplicitConversion: true, // Converte strings para números quando necessário
+      },
+    }),
+  );
 
   app.setGlobalPrefix('api/v1');
   app.use(cookieParser());
