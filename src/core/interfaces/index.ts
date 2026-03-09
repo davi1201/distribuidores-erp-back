@@ -2,7 +2,10 @@
 // COMMON INTERFACES - Interfaces tipadas reutilizáveis
 // ============================================================================
 
-import { Decimal } from '@prisma/client/runtime/library';
+import Decimal from 'decimal.js';
+
+// Re-export Decimal type for consumers
+export type { Decimal };
 
 // ---------------------------------------------------------------------------
 // Base Interfaces

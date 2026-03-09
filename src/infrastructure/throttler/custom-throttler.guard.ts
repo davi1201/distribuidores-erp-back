@@ -17,6 +17,9 @@ const SKIP_ROUTES = [
   '/webhooks/clerk',
   '/health',
   '/ready',
+  '/overview',
+  '/commissions/my-metrics',
+  '/me',
 ];
 
 /**

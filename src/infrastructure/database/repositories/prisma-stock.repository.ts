@@ -44,7 +44,7 @@ type StockTransferWithRelations = StockTransfer & {
   items?: Array<{
     id: string;
     productId: string;
-    quantity: import('@prisma/client/runtime/library').Decimal;
+    quantity: Prisma.Decimal;
     product?: { id: string; name: string };
   }>;
 };

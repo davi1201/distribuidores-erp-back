@@ -10,7 +10,7 @@ import {
   CommissionType,
   CommissionScope,
 } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import Decimal from 'decimal.js';
 
 // DTOs
 import { CreatePayoutDto } from './dto/create-payout.dto';

@@ -414,7 +414,7 @@ export class SalesService {
           tenantPaymentMethodId: op.tenantPaymentMethodId,
           paymentTermId: op.paymentTermId || undefined,
           installmentCount: op.installments,
-          startDate: new Date(payload.currentDueDate || Date.now()),
+          startDate: new Date(op.dueDate || Date.now()),
           tx,
         });
         paymentIndex++;

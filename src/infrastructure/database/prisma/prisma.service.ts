@@ -2,6 +2,8 @@ import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { createLogger } from '../../../core/logging';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 @Injectable()
 export class PrismaService
@@ -9,11 +11,21 @@ export class PrismaService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = createLogger(PrismaService.name);
+  private readonly pool: Pool;
 
   constructor(private readonly configService: ConfigService) {
     const isDev = configService.get('NODE_ENV') === 'development';
+    const databaseUrl = configService.get<string>('DATABASE_URL');
+
+    if (!databaseUrl) {
+      throw new Error('DATABASE_URL is not defined');
+    }
+
+    const pool = new Pool({ connectionString: databaseUrl });
+    const adapter = new PrismaPg(pool);
 
     super({
+      adapter,
       log: isDev
         ? [
             { emit: 'event', level: 'query' },
@@ -26,6 +38,8 @@ export class PrismaService
             { emit: 'stdout', level: 'error' },
           ],
     });
+
+    this.pool = pool;
 
     // Log slow queries em desenvolvimento
     if (isDev) {
@@ -51,6 +65,7 @@ export class PrismaService
 
   async onModuleDestroy() {
     await this.$disconnect();
+    await this.pool.end();
     this.logger.log('Database connection closed');
   }
 

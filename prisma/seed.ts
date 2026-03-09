@@ -1,8 +1,16 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
+import { config } from 'dotenv';
 
-const prisma = new PrismaClient();
+// Ensure env is loaded before Pool creation
+config();
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   const seedsDir = path.join(__dirname, 'seeds'); // Caminho para a pasta seeds
@@ -48,5 +56,6 @@ main()
     process.exit(1);
   })
   .finally(async () => {
+    await pool.end();
     await prisma.$disconnect();
   });

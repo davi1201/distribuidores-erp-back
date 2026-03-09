@@ -5,9 +5,6 @@ export class CreatePriceListDto {
   @IsNotEmpty()
   name: string;
 
-  @IsString({ message: 'A descrição deve ser uma string' })
-  tenantId: string;
-
   @IsOptional()
   percentageAdjustment?: number;
 

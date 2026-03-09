@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Plan } from '@prisma/client';
-import { Decimal } from '@prisma/client/runtime/library';
+import Decimal from 'decimal.js';
 
 export class PlanEntity implements Plan {
   @ApiProperty({ example: 'uuid-123-456', description: 'ID único do plano' })

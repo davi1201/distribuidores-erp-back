@@ -7,6 +7,7 @@ import {
   Delete,
   UseGuards,
   Query,
+  Put,
 } from '@nestjs/common';
 
 import { CreatePaymentTermDto } from './dto/create-payment-term.dto';
@@ -14,6 +15,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import type { User } from '@prisma/client';
 import { ClerkAuthGuard } from '../auth/guards/clerk-auth.guard';
 import { PaymentTermsService } from './payment-term.service';
+import { UpdatePaymentTermDto } from './dto/update-payment-term.dto';
 
 @Controller('payment-terms')
 @UseGuards(ClerkAuthGuard)
@@ -23,6 +25,15 @@ export class PaymentTermsController {
   @Post()
   create(@Body() dto: CreatePaymentTermDto, @CurrentUser() user: User) {
     return this.paymentTermsService.create(dto, user.tenantId || '');
+  }
+
+  @Put(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdatePaymentTermDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.paymentTermsService.update(id, dto, user.tenantId || '');
   }
 
   @Get()

@@ -6,79 +6,92 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  IsDateString,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+// --- DTO PARA OS ITENS DO PEDIDO ---
 export class OrderItemDto {
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   productId: string;
-
-  @IsOptional()
-  @IsUUID()
-  @IsString()
-  sellerId?: string;
 
   @IsNumber()
   @Min(1)
   quantity: number;
 
   @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  unitPrice: number; // Adicionado conforme payload
+
+  @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   discount?: number;
 
   @IsString()
   @IsNotEmpty()
-  deliveryType: 'READY' | 'PRE_ORDER';
+  // Ajustado para bater com "READY_DELIVERY" do JSON
+  deliveryType: 'READY_DELIVERY' | 'PRE_ORDER';
 }
 
-export class InstallmentPlanDto {
-  @IsNumber()
-  days: number;
+// --- DTO PARA OS PAGAMENTOS (MULTIPAGAMENTO) ---
+export class OrderPaymentDto {
+  @IsUUID()
+  @IsNotEmpty()
+  tenantPaymentMethodId: string;
+
+  @IsUUID()
+  @IsOptional()
+  paymentTermId?: string;
 
   @IsNumber()
-  @IsOptional()
-  percent?: number;
+  @Min(0)
+  @Type(() => Number)
+  amount: number;
 
-  @IsNumber()
+  @IsDateString()
   @IsOptional()
-  fixedAmount?: number;
+  dueDate?: string; // Formato "2026-03-10"
 }
 
+// --- DTO PRINCIPAL DE CRIAÇÃO DE PEDIDO ---
 export class CreateOrderDto {
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   customerId: string;
 
-  @IsString()
+  @IsUUID()
   @IsNotEmpty()
   priceListId: string;
 
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   shipping?: number;
 
   @IsNumber()
   @IsOptional()
+  @Type(() => Number)
   discount?: number;
 
-  @IsString()
-  paymentMethodId: string;
-
-  @IsString()
-  @IsOptional()
-  paymentTermId?: string; // NOVO: ID da condição de pagamento
+  @IsNumber()
+  @IsNotEmpty()
+  @Type(() => Number)
+  totalAmount: number; // Adicionado conforme payload
 
   @IsArray()
   @ValidateNested({ each: true })
-  @Type(() => InstallmentPlanDto)
-  @IsOptional()
-  installmentsPlan?: InstallmentPlanDto[]; // NOVO: Plano manual se flexível
+  @Type(() => OrderPaymentDto)
+  @IsNotEmpty()
+  payments: OrderPaymentDto[]; // Substituiu os campos flat anteriores
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => OrderItemDto)
+  @IsNotEmpty()
   items: OrderItemDto[];
 }

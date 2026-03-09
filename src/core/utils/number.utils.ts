@@ -2,22 +2,35 @@
 // UTILITÁRIOS NUMÉRICOS
 // ============================================================================
 
-import { Decimal } from '@prisma/client/runtime/library';
+import Decimal from 'decimal.js';
 
 /**
  * Converte valor para número seguro (trata Decimal do Prisma)
  */
 export function toNumber(
-  value: number | Decimal | string | null | undefined,
+  value:
+    | number
+    | Decimal
+    | { toNumber?: () => number }
+    | string
+    | null
+    | undefined,
 ): number {
   if (value === null || value === undefined) return 0;
   if (typeof value === 'number') return value;
   if (value instanceof Decimal) return value.toNumber();
+  if (
+    typeof value === 'object' &&
+    'toNumber' in value &&
+    typeof value.toNumber === 'function'
+  ) {
+    return value.toNumber();
+  }
   return Number(value) || 0;
 }
 
 /**
- * Converte para Decimal do Prisma
+ * Converte para Decimal
  */
 export function toDecimal(value: number | string): Decimal {
   return new Decimal(value);

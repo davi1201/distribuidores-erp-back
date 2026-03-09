@@ -28,20 +28,26 @@ class CreateAddressDto {
   @IsString() @IsOptional() number?: string;
   @IsString() @IsOptional() complement?: string;
   @IsString() @IsOptional() neighborhood?: string;
-  @IsNumber() @IsOptional() city?: number;
-  @IsNumber() @IsOptional() state?: number;
+
+  // Voltamos para number para bater com o Service
+  // Mas usamos o @Type para aceitar o "4047" do front
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  city?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Type(() => Number)
+  state?: number;
+
   @IsString() @IsOptional() ibgeCode?: string;
-  @IsString() @IsOptional() categoryId?: string; // ID da categoria criada previamente
+  @IsString() @IsOptional() categoryId?: string;
 }
 
 class CreateAttachmentDto {
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  url: string;
+  @IsString() @IsNotEmpty() name: string;
+  @IsString() @IsNotEmpty() url: string;
 }
 
 export class CreateCustomerDto {
@@ -53,7 +59,9 @@ export class CreateCustomerDto {
 
   @IsEnum(PersonType) personType: PersonType;
 
-  @IsString() @IsOptional() document?: string; // CPF ou CNPJ
+  @IsString() @IsOptional() document?: string;
+
+  @IsBoolean() @IsOptional() isActive?: boolean; // Adicionado conforme o payload
 
   // --- Regra Condicional PJ ---
   @ValidateIf((o) => o.personType === 'PJ')
@@ -81,12 +89,15 @@ export class CreateCustomerDto {
   @IsString() @IsOptional() invoiceNotes?: string;
 
   // --- Financeiro ---
-  @IsNumber() @IsOptional() creditLimit?: number;
+  @IsNumber() @IsOptional() @Type(() => Number) creditLimit?: number;
   @IsBoolean() @IsOptional() allowExceedLimit?: boolean;
+
   @IsString() @IsOptional() sellerId?: string;
   @IsString() @IsOptional() categoryId?: string;
+  @IsString() @IsOptional() priceListId?: string;
+  @IsString() @IsOptional() paymentConditionId?: string;
 
-  // --- Nested Writes (Cria junto) ---
+  // --- Nested Writes ---
   @IsOptional()
   @ValidateNested({ each: true })
   @Type(() => CreateContactDto)
@@ -101,12 +112,4 @@ export class CreateCustomerDto {
   @ValidateNested({ each: true })
   @Type(() => CreateAttachmentDto)
   attachments?: CreateAttachmentDto[];
-
-  @IsString()
-  @IsOptional()
-  priceListId: string;
-
-  @IsString()
-  @IsOptional()
-  paymentConditionId?: string;
 }

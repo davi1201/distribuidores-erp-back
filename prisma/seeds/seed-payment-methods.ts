@@ -1,8 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
-
-async function main() {
+export default async function seed(prisma: PrismaClient) {
   console.log('🌱 Iniciando o seed de Métodos de Pagamento do Sistema...');
 
   const paymentMethods = [
@@ -63,12 +61,3 @@ async function main() {
 
   console.log('✅ Seed de métodos de pagamento finalizado com sucesso!');
 }
-
-main()
-  .catch((e) => {
-    console.error('❌ Erro ao rodar o seed:', e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
