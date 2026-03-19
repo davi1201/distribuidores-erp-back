@@ -1,18 +1,14 @@
 model AuditLog {
-  id       String  @id @default(uuid())
-  action   String
-  entity   String
-  entityId String?
-
-  // Quem fez a ação?
-  userId String
-  user   User   @relation(fields: [userId], references: [id])
-
-  ipAddress String? // IP de quem fez
-  userAgent String? // Navegador/Dispositivo
-  details   Json? // Aqui salvamos o "Antes" e "Depois". Ex: { "oldPrice": 10, "newPrice": 20 }
-
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
+  userId    String
+  ipAddress String?
+  userAgent String?
+  details   Json?
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 
   @@map("audit_logs")
 }

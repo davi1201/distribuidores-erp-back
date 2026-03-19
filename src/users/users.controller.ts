@@ -37,9 +37,9 @@ export class UsersController {
     return this.usersService.updateProfile(user.userId, data);
   }
 
-  @Patch('company') // Nova rota para editar a empresa
+  @Patch('update-profile')
   updateCompany(@CurrentUser() user: any, @Body() data: any) {
-    return this.usersService.updateCompanyProfile(user.userId, data);
+    return this.usersService.updateProfile(user.userId, data);
   }
 
   @Get('sellers')

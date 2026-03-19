@@ -12,6 +12,10 @@ export class ProductImageDto {
   @IsString()
   url: string;
 
+  @IsString()
+  @IsOptional()
+  name?: string;
+
   @IsNumber()
   @IsOptional()
   order?: number;
@@ -188,6 +192,10 @@ export class ParentProductDataDto {
 export class ProductVariantDto {
   @IsString()
   name: string; // Ex: "400ml", "Azul", etc
+
+  @IsString()
+  @IsOptional()
+  variantName?: string;
 
   @IsString()
   @IsOptional()

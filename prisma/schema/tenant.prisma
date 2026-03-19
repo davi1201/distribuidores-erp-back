@@ -1,136 +1,77 @@
 model Tenant {
-  id       String  @id @default(uuid())
-  slug     String  @unique // URL da empresa (ex: app.sistema.com/slug)
-  name     String // Nome de exibição
-  isActive Boolean @default(true)
-  clerkId  String? @unique
-  logoUrl  String?
-
-  // --- Assinatura e Plano ---
-  planId         String // Dica: Se o tenant puder ser criado antes de pagar, mude para String?
-  plan           Plan            @relation(fields: [planId], references: [id])
-  trialEndsAt    DateTime?
-  billingProfile BillingProfile?
-  subscriptions  Subscription[]
-
-  // --- Integração Financeira (Asaas) ---
-  asaasAccountId     String? // 🔥 ADICIONE ESTE CAMPO
-  asaasApiKey        String? // A chave exclusiva deste Tenant (Subconta)
-  asaasWalletId      String? // ID da carteira dele no Asaas
-  asaasPixKey        String? // Adicione este campo para guardar a chave gerada  
-  asaasOnboardingUrl String? // URL temporária para o lojista completar o onboarding (subir docs, etc). Expira em 24h.
-  asaasAccountStatus String  @default("PENDING") // PENDING, AWAITING_APPROVAL, APPROVED, REJECTED
-
-  // =====================================================================
-  // CONTROLE DE LIMITES (Arquitetura Dois Baldes)
-  // =====================================================================
-  // Balde 1: Vem do Plano. Reseta para o valor de Plan.maxBoletos a cada renovação
-  monthlyBoletoBalance Int @default(0)
-
-  // Balde 2: Pacote Avulso. Não expira, apenas acumula e decrementa
-  extraBoletoBalance Int @default(0)
-  // =====================================================================
-
-  // --- Relacionamentos do ERP ---
-  users              User[]
-  customers          Customer[]
-  addressCategories  AddressCategory[]
-  customerCategories CustomerCategory[]
-  priceLists         PriceList[]
-  attachments        Attachment[]
-  products           Product[]
-  taxProfiles        TaxProfile[]
-  financialTitles    FinancialTitle[]
-  financialMovements FinancialMovement[]
-  StockMovement      StockMovement[]
-  Order              Order[]
-  Invite             Invite[]
-  Warehouse          Warehouse[]
-  Supplier           Supplier[]
-  ProductSupplier    ProductSupplier[]
-  StockTransfer      StockTransfer[]
-  NfeInbox           NfeInbox[]
-  FinancialCategory  FinancialCategory[]
-  PaymentTerm        PaymentTerm[]
-  ProductPrice       ProductPrice[]
-  CommissionRule     CommissionRule[]
-  CommissionRecord   CommissionRecord[]
-  CommissionPayout   CommissionPayout[]
-  BankAccount        BankAccount[]
-
-  TenantEmailConfig TenantEmailConfig?
-
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
-  TenantPaymentMethod TenantPaymentMethod[]
-  OrderPayment        OrderPayment[]
+  id                            String                @id @default(uuid())
+  slug                          String                @unique
+  name                          String
+  isActive                      Boolean               @default(true)
+  clerkId                       String?               @unique
+  logoUrl                       String?
+  planId                        String
+  trialEndsAt                   DateTime?
+  asaasAccountId                String?
+  asaasApiKey                   String?
+  asaasWalletId                 String?
+  asaasPixKey                   String?
+  asaasOnboardingUrl            String?
+  asaasAccountStatus            String                @default("PENDING")
+  monthlyBoletoBalance          Int                   @default(0)
+  extraBoletoBalance            Int                   @default(0)
+  // PlugNotas Integration
+  plugnotasApiKey               String?
+  plugnotasEmpresaCnpj          String?
+  plugnotasCertificadoValido    Boolean               @default(false)
+  plugnotasCertificadoVencimento DateTime?
+  plugnotasAmbiente             Int                   @default(2) // 1=Produção, 2=Homologação
+  regimeTributario              Int                   @default(1) // 1=Simples Nacional, 2=Simples Excesso, 3=Regime Normal
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+  addressCategories             AddressCategory[]
+  BankAccount                   BankAccount[]
+  billingProfile                BillingProfile?
+  CommissionPayout              CommissionPayout[]
+  CommissionRecord              CommissionRecord[]
+  CommissionRule                CommissionRule[]
+  attachments                   Attachment[]
+  customerCategories            CustomerCategory[]
+  customers                     Customer[]
+  FinancialCategory             FinancialCategory[]
+  financialMovements            FinancialMovement[]
+  financialTitles               FinancialTitle[]
+  Invite                        Invite[]
+  NfeInbox                      NfeInbox[]
+  NfeEmitida                    NfeEmitida[]
+  NfeInutilizacao               NfeInutilizacao[]
+  OrderPayment                  OrderPayment[]
+  Order                         Order[]
+  PaymentTerm                   PaymentTerm[]
+  priceLists                    PriceList[]
+  ProductPrice                  ProductPrice[]
+  ProductSupplier               ProductSupplier[]
+  products                      Product[]
+  StockMovement                 StockMovement[]
+  StockTransfer                 StockTransfer[]
+  subscriptions                 Subscription[]
+  Supplier                      Supplier[]
+  taxProfiles                   TaxProfile[]
+  TenantEmailConfig             TenantEmailConfig?
+  TenantPaymentMethod           TenantPaymentMethod[]
+  plan                          Plan                  @relation(fields: [planId], references: [id])
+  users                         User[]
+  Warehouse                     Warehouse[]
 
   @@map("tenants")
 }
 
 model TenantEmailConfig {
-  id       String @id @default(uuid())
-  tenantId String @unique
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  host     String // ex: imap.gmail.com
-  port     Int     @default(993)
-  user     String // email
-  password String  @db.Text // Usando @db.Text caso o hash de criptografia fique muito grande
-  isActive Boolean @default(true)
-
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  host      String
+  port      Int      @default(993)
+  user      String
+  password  String
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
   @@map("tenant_email_configs")
-}
-
-model TenantPaymentMethod {
-  id                    String @id @default(uuid())
-  tenantId              String
-  systemPaymentMethodId String
-
-  customName String?
-  isActive   Boolean @default(true)
-
-  discountPercentage Decimal @default(0) @db.Decimal(5, 2)
-
-  maxInstallments     Int     @default(1)
-  minInstallmentValue Decimal @default(0) @db.Decimal(10, 2)
-  passFeeToCustomer   Boolean @default(false)
-  isAnticipated       Boolean @default(true)
-  isConfigured        Boolean @default(false)
-
-  // --- RELAÇÕES ---
-  tenant              Tenant              @relation(fields: [tenantId], references: [id])
-  systemPaymentMethod SystemPaymentMethod @relation(fields: [systemPaymentMethodId], references: [id])
-
-  installments TenantPaymentInstallment[]
-
-  // 🔥 CORREÇÃO: Mão dupla para a relação N:N com PaymentTerm
-  // Isso permite vincular condições de pagamento (ex: 30/60/90) a este método
-  allowedPaymentTerms PaymentTerm[] @relation("TermToMethod")
-
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
-  FinancialTitle    FinancialTitle[]
-  FinancialMovement FinancialMovement[]
-  OrderPayment      OrderPayment[]
-
-  @@unique([tenantId, systemPaymentMethodId])
-  @@map("tenant_payment_methods")
-}
-
-model TenantPaymentInstallment {
-  id                    String @id @default(uuid())
-  tenantPaymentMethodId String
-
-  installment   Int // Número da parcela (Ex: 1, 2, 3...)
-  feePercentage Decimal @db.Decimal(5, 2) // Taxa que a maquininha cobra (Ex: 4.5%)
-  receiveInDays Int     @default(30) // Em quantos dias cai na conta (se isAnticipated for false)
-
-  tenantPaymentMethod TenantPaymentMethod @relation(fields: [tenantPaymentMethodId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantPaymentMethodId, installment])
-  @@map("tenant_payment_installments")
 }

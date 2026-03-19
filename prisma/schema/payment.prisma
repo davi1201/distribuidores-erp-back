@@ -1,90 +1,83 @@
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELED
-  PAID
-  PENDING_PAYMENT
-  ENDED
-  PAST_DUE
+model SystemPaymentMethod {
+  id            String                @id @default(uuid())
+  name          String
+  code          String                @unique
+  isAcquirer    Boolean               @default(false)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  tenantMethods TenantPaymentMethod[]
+
+  @@map("system_payment_methods")
 }
 
-model Subscription {
-  id String @id @default(uuid())
+model TenantPaymentMethod {
+  id                    String   @id @default(uuid())
+  tenantId              String
+  systemPaymentMethodId String
+  customName            String?
+  isActive              Boolean  @default(true)
+  maxInstallments       Int      @default(1)
+  minInstallmentValue   Decimal  @default(0) @db.Decimal(10, 2)
+  passFeeToCustomer     Boolean  @default(false)
+  isAnticipated         Boolean  @default(true)
+  isConfigured          Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  // ID da assinatura (Stripe: sub_... | Asaas: sub_... ou installment_...)
-  externalId String @unique
-  // ID do cliente no gateway (Stripe: cus_... | Asaas: cus_...)
-  customerId String
-  status     String // active, past_due, canceled
+  // Configurações de Boleto / PIX
+  discountPercentage Decimal @default(0) @db.Decimal(5, 2) // % desconto pagamento em dia
+  interestRatePerDay Decimal @default(0) @db.Decimal(6, 4) // % mora/dia (0.0333 = 1%/mês)
+  finePercentage     Decimal @default(0) @db.Decimal(5, 2) // % multa atraso (máx legal 2%)
+  dueDays            Int     @default(3) // dias para vencimento
 
-  // 👇 NOVO: Identifica qual gateway processou essa assinatura
-  gateway String @default("STRIPE") // "STRIPE" ou "ASAAS"
+  FinancialMovement   FinancialMovement[]
+  FinancialTitle      FinancialTitle[]
+  OrderPayment        OrderPayment[]
+  installments        TenantPaymentInstallment[]
+  systemPaymentMethod SystemPaymentMethod        @relation(fields: [systemPaymentMethodId], references: [id])
+  tenant              Tenant                     @relation(fields: [tenantId], references: [id])
+  allowedPaymentTerms PaymentTerm[]              @relation("TermToMethod")
 
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  planId String
-  plan   Plan   @relation(fields: [planId], references: [id])
-
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  Invoice   Invoice[]
-
-  @@map("subscriptions")
+  @@unique([tenantId, systemPaymentMethodId])
+  @@map("tenant_payment_methods")
 }
 
-model Invoice {
-  id         String  @id @default(uuid())
-  externalId String  @unique // O ID "inv_..." da Pagar.me
-  amount     Decimal @db.Decimal(10, 2)
-  status     String // paid, pending, failed
+model TenantPaymentInstallment {
+  id                    String              @id @default(uuid())
+  tenantPaymentMethodId String
+  installment           Int
+  feePercentage         Decimal             @db.Decimal(5, 2)
+  receiveInDays         Int                 @default(30)
+  tenantPaymentMethod   TenantPaymentMethod @relation(fields: [tenantPaymentMethodId], references: [id], onDelete: Cascade)
 
-  subscriptionId String
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@map("invoices")
+  @@unique([tenantPaymentMethodId, installment])
+  @@map("tenant_payment_installments")
 }
-
-// Adicione ao seu schema.prisma
 
 model PaymentTerm {
-  id          String  @id @default(uuid())
-  tenantId    String
-  name        String // Ex: "30/60/90 dias"
-  description String?
-  type        String // 'PAYABLE', 'RECEIVABLE', 'BOTH'
-  isActive    Boolean @default(true)
-
-  // --- MELHORIAS DE ERP ---
-
-  // Valor mínimo para esta condição ser liberada (Ex: 3x apenas acima de R$ 300)
-  minAmount Decimal @default(0) @db.Decimal(15, 2)
-
-  // Quantidade de parcelas que essa regra gera (facilita filtros e queries)
-  installmentsCount Int @default(1)
-
-  // Se true, permite que o vendedor altere as datas manualmente no ato da venda
-  isFlexible Boolean @default(false)
-
-  // Estrutura: [{"days": 30, "percent": 50}, {"days": 60, "percent": 50}]
-  rules Json
-
-  // Relação N:N - Restringe quais métodos aceitam esta condição
-  // Se vazio, aceita todos. Se tiver "Boleto", essa condição só aparece se o Meio for Boleto.
-  allowedMethods TenantPaymentMethod[] @relation("TermToMethod")
-
-  Tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  titles       FinancialTitle[]
-  movements    FinancialMovement[]
-  orders       Order[]
-  OrderPayment OrderPayment[]
+  id                 String                @id @default(uuid())
+  tenantId           String
+  name               String
+  description        String?
+  type               String
+  isActive           Boolean               @default(true)
+  minAmount          Decimal               @default(0) @db.Decimal(15, 2)
+  installmentsCount  Int                   @default(1)
+  isFlexible         Boolean               @default(false)
+  rules              Json
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  discountDays       Int                   @default(0)
+  discountPercentage Decimal               @default(0) @db.Decimal(5, 2)
+  finePercentage     Decimal               @default(0) @db.Decimal(5, 2)
+  instructions       String?
+  interestPercentage Decimal               @default(0) @db.Decimal(5, 2)
+  movements          FinancialMovement[]
+  titles             FinancialTitle[]
+  OrderPayment       OrderPayment[]
+  orders             Order[]
+  Tenant             Tenant                @relation(fields: [tenantId], references: [id])
+  allowedMethods     TenantPaymentMethod[] @relation("TermToMethod")
 
   @@map("payment_terms")
 }

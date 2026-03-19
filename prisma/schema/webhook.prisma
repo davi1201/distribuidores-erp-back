@@ -1,22 +1,18 @@
+model WebhookEvent {
+  id           String        @id @default(uuid())
+  provider     String
+  eventType    String
+  payload      Json
+  status       WebhookStatus @default(PENDING)
+  errorMessage String?
+  tenantId     String?
+  externalId   String?
+  createdAt    DateTime      @default(now())
+  processedAt  DateTime?
+}
+
 enum WebhookStatus {
   PENDING
   PROCESSED
   FAILED
-}
-
-model WebhookEvent {
-  id        String @id @default(uuid())
-  provider  String // Ex: 'ASAAS', 'CLERK', 'STRIPE'
-  eventType String // Ex: 'PAYMENT_RECEIVED', 'user.created'
-  payload   Json // 🔥 Guarda o JSON bruto inteiro aqui!
-
-  status       WebhookStatus @default(PENDING)
-  errorMessage String?       @db.Text // Se der erro no NestJS, guardamos o motivo aqui
-
-  // Campos de atalho para facilitar a busca no seu banco depois
-  tenantId   String?
-  externalId String? // Ex: ID do pagamento (pay_123) ou ID do usuário Clerk (user_2aZ...)
-
-  createdAt   DateTime  @default(now())
-  processedAt DateTime?
 }

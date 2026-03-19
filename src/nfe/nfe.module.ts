@@ -5,10 +5,12 @@ import { ProductsModule } from '../products/products.module';
 import { StockModule } from '../stock/stock.module';
 import { MailWatcherService } from './nfe-watcher.service';
 import { FinancialModule } from '../financial/financial.module';
+import { PlugNotasModule } from './plugnotas/plugnotas.module';
 
 @Module({
-  imports: [ProductsModule, StockModule, FinancialModule],
+  imports: [ProductsModule, StockModule, FinancialModule, PlugNotasModule],
   controllers: [NfeController],
   providers: [NfeService, MailWatcherService],
+  exports: [PlugNotasModule],
 })
 export class NfeModule {}

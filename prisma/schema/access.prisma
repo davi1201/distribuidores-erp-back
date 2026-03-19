@@ -1,20 +1,14 @@
 model Invite {
-  id    String @id @default(uuid())
-  token String @unique
-  email String
-
-  // NOVO CAMPO: O admin define o nome no convite
-  name String
-
-  role     Role
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  // Guarda as configs do Seller (comissão, whatsapp, etc)
-  metadata Json?
-
+  id        String   @id @default(uuid())
+  token     String   @unique
+  email     String
+  name      String
+  role      Role
+  tenantId  String
+  metadata  Json?
   expiresAt DateTime
   createdAt DateTime @default(now())
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
   @@map("invites")
 }

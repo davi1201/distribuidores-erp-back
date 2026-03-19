@@ -3,6 +3,7 @@ import { createLogger } from '../../core/logging';
 
 import axios from 'axios';
 import { PrismaService } from '../../prisma/prisma.service';
+import { OnEvent } from '@nestjs/event-emitter';
 
 // Core imports
 import { ERROR_MESSAGES, ENTITY_NAMES } from '../../core/constants';
@@ -18,7 +19,64 @@ export class AsaasBillingService {
   constructor(private prisma: PrismaService) {}
 
   // ==========================================================================
-  // 1. GARANTIR CLIENTE NO ASAAS
+  // 1. PROCESSAMENTO DE WEBHOOKS (Ativação de Assinaturas)
+  // ==========================================================================
+  @OnEvent('asaas.PAYMENT_RECEIVED')
+  @OnEvent('asaas.PAYMENT_CONFIRMED')
+  async handleSubscriptionPayment(payload: any) {
+    const { event, payment } = payload;
+    const paymentId = payment.id;
+    const subscriptionId = payment.subscription;
+
+    this.logger.log(
+      `Processando pagamento de assinatura no Asaas: ${paymentId}`,
+    );
+
+    // 1. Busca se este pagamento ou assinatura pertence a uma Subscription no nosso banco
+    // Pode ser o externalId da assinatura (sub_...) ou do pagamento (pay_...)
+    const dbSub = await this.prisma.subscription.findFirst({
+      where: {
+        OR: [{ externalId: subscriptionId }, { externalId: paymentId }],
+        gateway: 'ASAAS',
+      },
+      include: { plan: true },
+    });
+
+    if (!dbSub) {
+      this.logger.debug(
+        `Pagamento ${paymentId} não pertence a nenhuma assinatura da plataforma.`,
+      );
+      return;
+    }
+
+    // 2. Se a assinatura está pendente ou atrasada, ativa ela
+    if (dbSub.status !== 'active') {
+      await this.prisma.$transaction([
+        this.prisma.subscription.update({
+          where: { id: dbSub.id },
+          data: {
+            status: 'active',
+            currentPeriodStart: new Date(),
+            // Calcula o fim do período baseado no ciclo original se disponível, ou assume 30 dias
+            currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          },
+        }),
+        this.prisma.tenant.update({
+          where: { id: dbSub.tenantId },
+          data: {
+            isActive: true,
+            planId: dbSub.planId,
+            monthlyBoletoBalance: dbSub.plan.maxBoletos,
+          },
+        }),
+      ]);
+
+      this.logger.log(`Assinatura ativada para o Tenant: ${dbSub.tenantId}`);
+    }
+  }
+
+  // ==========================================================================
+  // 2. GARANTIR CLIENTE NO ASAAS
   // ==========================================================================
   // ==========================================================================
   // 1. GARANTIR CLIENTE NO ASAAS E SALVAR NA BASE
@@ -55,8 +113,8 @@ export class AsaasBillingService {
           {
             name: tenant.name,
             cpfCnpj: tenant.billingProfile.document,
-            email: tenant.billingProfile.email,
-            mobilePhone: tenant.billingProfile.phone,
+            email: tenant.billingProfile.billingEmail,
+            mobilePhone: tenant.billingProfile.commercialPhone,
           },
           { headers: { access_token: this.masterApiKey } },
         );
@@ -244,7 +302,116 @@ export class AsaasBillingService {
   }
 
   // ==========================================================================
-  // 3. UPGRADE DE PLANO COM 1 CLIQUE (USANDO TOKEN GUARDADO)
+  // 3. CHECKOUT PIX (QR CODE)
+  // ==========================================================================
+  async processPixCheckout(
+    tenantId: string,
+    planId: string,
+    cycle: 'MONTHLY' | 'YEARLY',
+  ) {
+    const customerId = await this.getOrCreateCustomer(tenantId);
+
+    const plan = await this.prisma.plan.findUnique({ where: { id: planId } });
+    if (!plan)
+      throw new HttpException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PLAN),
+        HttpStatus.NOT_FOUND,
+      );
+
+    const planPrice = cycle === 'YEARLY' ? plan.yearlyPrice : plan.price;
+    if (!planPrice)
+      throw new HttpException(
+        'Preço não configurado para este ciclo.',
+        HttpStatus.BAD_REQUEST,
+      );
+
+    try {
+      let asaasExternalId = '';
+      const now = new Date();
+      let periodEnd = new Date();
+      let paymentId = '';
+
+      if (cycle === 'MONTHLY') {
+        const response = await axios.post(
+          `${this.baseURL}/subscriptions`,
+          {
+            customer: customerId,
+            billingType: 'PIX',
+            value: toNumber(planPrice),
+            nextDueDate: now.toISOString().split('T')[0],
+            cycle: 'MONTHLY',
+            description: `Assinatura ${plan.name} - Mensal`,
+          },
+          { headers: { access_token: this.masterApiKey } },
+        );
+
+        asaasExternalId = response.data.id;
+        periodEnd.setMonth(now.getMonth() + 1);
+
+        // Busca a primeira cobrança da assinatura para gerar o QR Code
+        const paymentsResponse = await axios.get(
+          `${this.baseURL}/subscriptions/${asaasExternalId}/payments`,
+          { headers: { access_token: this.masterApiKey } },
+        );
+        paymentId = paymentsResponse.data.data[0].id;
+      } else {
+        const response = await axios.post(
+          `${this.baseURL}/payments`,
+          {
+            customer: customerId,
+            billingType: 'PIX',
+            value: toNumber(planPrice),
+            dueDate: now.toISOString().split('T')[0],
+            description: `Assinatura ${plan.name} - Anual`,
+          },
+          { headers: { access_token: this.masterApiKey } },
+        );
+
+        asaasExternalId = response.data.id;
+        paymentId = response.data.id;
+        periodEnd.setFullYear(now.getFullYear() + 1);
+      }
+
+      // 1. Cria a assinatura no nosso banco como pending_payment
+      await this.prisma.subscription.create({
+        data: {
+          tenantId,
+          planId: plan.id,
+          gateway: 'ASAAS',
+          externalId: asaasExternalId,
+          customerId: customerId,
+          status: 'pending_payment',
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+        },
+      });
+
+      // 2. Gera o QR Code do pagamento
+      const qrCodeResponse = await axios.get(
+        `${this.baseURL}/payments/${paymentId}/pixQrCode`,
+        { headers: { access_token: this.masterApiKey } },
+      );
+
+      return {
+        success: true,
+        paymentId,
+        encodedImage: qrCodeResponse.data.encodedImage,
+        payload: qrCodeResponse.data.payload,
+        expirationDate: qrCodeResponse.data.expirationDate,
+      };
+    } catch (error) {
+      this.handleAsaasError(error);
+    }
+  }
+
+  private handleAsaasError(error: any) {
+    const message =
+      error.response?.data?.errors?.[0]?.description || error.message;
+    throw new HttpException(message, HttpStatus.BAD_GATEWAY);
+  }
+
+  // ==========================================================================
+  // 4. UPGRADE DE PLANO COM 1 CLIQUE (USANDO TOKEN GUARDADO)
   // ==========================================================================
   async processOneClickUpgrade(
     tenantId: string,

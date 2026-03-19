@@ -51,6 +51,17 @@ export class TenantsController {
     return this.tenantsService.testEmailConnection(user.tenantId);
   }
 
+  @Get('payment-method-config/:systemMethodId')
+  async getConfig(
+    @CurrentUser() user: any,
+    @Param('systemMethodId') systemMethodId: string,
+  ) {
+    return this.tenantsService.getPaymentMethodConfig(
+      user.tenantId,
+      systemMethodId,
+    );
+  }
+
   @Post('payment-method-config/:systemMethodId')
   async saveConfig(
     @CurrentUser() user: any,

@@ -64,12 +64,9 @@ export class FinancialService {
     }
 
     let finalTotal = baseTotal;
+    // NOTA: Descontos agora são configurados na Condição de Pagamento (PaymentTerm)
+    // O cálculo de desconto será feito no momento da criação do título, baseado no PaymentTerm
     let discountValue = 0;
-
-    if (toNumber(method.discountPercentage) > 0) {
-      discountValue = baseTotal * (toNumber(method.discountPercentage) / 100);
-      finalTotal = baseTotal - discountValue;
-    }
 
     let feeValue = 0;
     if (

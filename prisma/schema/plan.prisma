@@ -1,32 +1,23 @@
 model Plan {
-  id              String  @id @default(uuid())
-  stripeProductId String? @unique
-  name            String
-  slug            String  @unique
-
-  price       Decimal  @db.Decimal(10, 2)
-  yearlyPrice Decimal? @db.Decimal(10, 2)
-
+  id                   String         @id @default(uuid())
+  stripeProductId      String?        @unique
+  name                 String
+  slug                 String         @unique
+  price                Decimal        @db.Decimal(10, 2)
+  yearlyPrice          Decimal?       @db.Decimal(10, 2)
   stripeMonthlyPriceId String?
   stripeYearlyPriceId  String?
-
-  // 👇 NOVOS CAMPOS PARA O ASAAS (Opcionais, úteis se você cadastrar os planos lá)
-  asaasMonthlyPlanId String?
-  asaasYearlyPlanId  String?
-
-  isActive Boolean @default(true)
-  features Json?
-
-  maxUsers   Int @default(1)
-  maxBoletos Int @default(0)
-
-  description String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenants       Tenant[]
-  subscriptions Subscription[]
+  asaasMonthlyPlanId   String?
+  asaasYearlyPlanId    String?
+  isActive             Boolean        @default(true)
+  features             Json?
+  maxUsers             Int            @default(1)
+  maxBoletos           Int            @default(0)
+  description          String?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  subscriptions        Subscription[]
+  tenants              Tenant[]
 
   @@map("plans")
 }

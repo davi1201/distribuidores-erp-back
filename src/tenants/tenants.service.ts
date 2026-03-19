@@ -92,17 +92,15 @@ export class TenantsService {
         tenantId: user.tenantId,
         personType: data.personType,
         document: data.document.replace(/\D/g, ''),
-        phone: data.phone.replace(/\D/g, ''),
-        email: user.email,
+        commercialPhone: data.phone.replace(/\D/g, ''),
+        billingEmail: user.email,
         zipCode: data.zipCode,
         street: data.street,
         number: data.number,
         complement: data.complement,
         neighborhood: data.neighborhood,
-        cityName: finalCityName,
-        stateUf: finalStateUf,
-        stateId: stateConnectId,
         cityId: cityConnectId,
+        stateId: stateConnectId,
       },
     });
   }
@@ -228,7 +226,7 @@ export class TenantsService {
   async savePaymentMethodConfig(
     tenantId: string,
     systemMethodId: string,
-    dto: any,
+    dto: any, // Considere criar uma interface/DTO tipada para isso (ex: UpdatePaymentMethodDto)
   ) {
     // 1. Validar se o método base realmente existe no sistema
     const systemMethod = await this.prisma.systemPaymentMethod.findUnique({
@@ -248,30 +246,38 @@ export class TenantsService {
         where: {
           tenantId_systemPaymentMethodId: {
             tenantId,
-            systemPaymentMethodId: systemMethodId, // 👈 Ajustado aqui
+            systemPaymentMethodId: systemMethodId,
           },
         },
         create: {
           tenantId,
-          systemPaymentMethodId: systemMethodId, // 👈 E aqui
+          systemPaymentMethodId: systemMethodId,
           customName: dto.customName || systemMethod.name,
-          isActive: dto.isActive ?? false,
-          discountPercentage: dto.discountPercentage || 0,
+          isActive: dto.isActive ?? true, // Ajustado para o default do schema
           maxInstallments: dto.maxInstallments || 1,
           minInstallmentValue: dto.minInstallmentValue || 0,
           passFeeToCustomer: dto.passFeeToCustomer ?? false,
           isAnticipated: dto.isAnticipated ?? true,
           isConfigured: true,
+          discountPercentage: dto.discountPercentage || 0,
+          interestRatePerDay: dto.interestRatePerDay || 0,
+          finePercentage: dto.finePercentage || 0,
+          dueDays: dto.dueDays || 3,
         },
         update: {
           customName: dto.customName,
           isActive: dto.isActive,
-          discountPercentage: dto.discountPercentage,
           maxInstallments: dto.maxInstallments,
           minInstallmentValue: dto.minInstallmentValue,
           passFeeToCustomer: dto.passFeeToCustomer,
           isAnticipated: dto.isAnticipated,
           isConfigured: true,
+
+          // Configurações de Boleto / PIX
+          discountPercentage: dto.discountPercentage,
+          interestRatePerDay: dto.interestRatePerDay,
+          finePercentage: dto.finePercentage,
+          dueDays: dto.dueDays,
         },
       });
 
@@ -301,5 +307,49 @@ export class TenantsService {
 
       return tenantMethod;
     });
+  }
+
+  async getPaymentMethodConfig(tenantId: string, systemMethodId: string) {
+    const systemMethod = await this.prisma.systemPaymentMethod.findUnique({
+      where: { id: systemMethodId },
+      include: {
+        tenantMethods: {
+          where: { tenantId },
+          include: {
+            installments: true,
+          },
+        },
+      },
+    });
+
+    if (!systemMethod) {
+      throw new NotFoundException(
+        ERROR_MESSAGES.NOT_FOUND(ENTITY_NAMES.PAYMENT_METHOD),
+      );
+    }
+
+    const config = systemMethod.tenantMethods[0]; // Deve haver no máximo 1 config por tenant
+
+    if (!config) {
+      return null; // Método existe, mas não está configurado para este tenant
+    }
+
+    return {
+      customName: config.customName,
+      isActive: config.isActive,
+      maxInstallments: config.maxInstallments,
+      minInstallmentValue: config.minInstallmentValue,
+      passFeeToCustomer: config.passFeeToCustomer,
+      isAnticipated: config.isAnticipated,
+      discountPercentage: config.discountPercentage,
+      interestRatePerDay: config.interestRatePerDay,
+      finePercentage: config.finePercentage,
+      dueDays: config.dueDays,
+      installments: config.installments.map((inst) => ({
+        installment: inst.installment,
+        feePercentage: inst.feePercentage,
+        receiveInDays: inst.receiveInDays,
+      })),
+    };
   }
 }

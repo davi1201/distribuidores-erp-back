@@ -1,58 +1,31 @@
-enum OrderStatus {
-  DRAFT // Rascunho
-  CONFIRMED // Confirmado (Saiu do estoque do vendedor, vida que segue)
-  SEPARATION // A SEPARAR (Saiu da Matriz, o Seller precisa buscar ou o Admin despachar)
-  INVOICED // Faturado
-  CANCELED // Cancelado
-  COMPLETED // Entregue
-}
-
-enum DeliveryType {
-  READY // Pronta Entrega
-  PRE_ORDER // Encomenda (A separar)
-}
-
 model Order {
-  id   String @id @default(uuid())
-  code Int    @default(autoincrement()) // Número do Pedido (ex: 1001)
-
-  // Quem comprou?
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id])
-
-  paymentTermId String?
-  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
-  // Qual a regra de preço usada?
-  priceListId   String
-  priceList     PriceList    @relation(fields: [priceListId], references: [id])
-
-  // Totais (Calculados)
-  subtotal Decimal @db.Decimal(10, 2) // Soma dos itens
-  discount Decimal @default(0) @db.Decimal(10, 2)
-  shipping Decimal @default(0) @db.Decimal(10, 2) // Frete
-  total    Decimal @db.Decimal(10, 2) // Final a pagar
-
-  // Impostos Totais (Soma dos itens)
-  totalIcms Decimal @default(0) @db.Decimal(10, 2)
-  totalIpi  Decimal @default(0) @db.Decimal(10, 2)
-
-  status OrderStatus @default(DRAFT)
-
-  items OrderItem[]
-
-  tenantId        String
-  tenant          Tenant           @relation(fields: [tenantId], references: [id])
-  financialTitles FinancialTitle[]
-
-  sellerId String?
-  seller   User?   @relation("SellerOrders", fields: [sellerId], references: [id])
-
+  id               String            @id @default(uuid())
+  code             Int               @default(autoincrement())
+  customerId       String
+  paymentTermId    String?
+  priceListId      String
+  subtotal         Decimal           @db.Decimal(10, 2)
+  discount         Decimal           @default(0) @db.Decimal(10, 2)
+  shipping         Decimal           @default(0) @db.Decimal(10, 2)
+  total            Decimal           @db.Decimal(10, 2)
+  totalIcms        Decimal           @default(0) @db.Decimal(10, 2)
+  totalIpi         Decimal           @default(0) @db.Decimal(10, 2)
+  status           OrderStatus       @default(DRAFT)
+  tenantId         String
+  sellerId         String?
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   commissionRecord CommissionRecord?
+  financialTitles  FinancialTitle[]
+  items            OrderItem[]
   payments         OrderPayment[]
+  nfes             NfeEmitida[]
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  paymentTerm      PaymentTerm?      @relation(fields: [paymentTermId], references: [id])
+  priceList        PriceList         @relation(fields: [priceListId], references: [id])
+  seller           User?             @relation("SellerOrders", fields: [sellerId], references: [id])
+  tenant           Tenant            @relation(fields: [tenantId], references: [id])
 
-  // Índices para performance em queries frequentes
   @@index([tenantId, status])
   @@index([tenantId, sellerId])
   @@index([tenantId, createdAt])
@@ -60,63 +33,54 @@ model Order {
 }
 
 model OrderItem {
-  id      String @id @default(uuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
-
-  quantity Decimal @db.Decimal(10, 4)
-
-  unitPrice  Decimal @db.Decimal(10, 2) // Preço unitário vindo da Tabela
-  discount   Decimal @default(0) @db.Decimal(10, 2)
-  totalPrice Decimal @db.Decimal(10, 2) // (Unit * Qty) - Discount
-
+  id           String       @id @default(uuid())
+  orderId      String
+  productId    String
+  quantity     Decimal      @db.Decimal(10, 4)
+  unitPrice    Decimal      @db.Decimal(10, 2)
+  discount     Decimal      @default(0) @db.Decimal(10, 2)
+  totalPrice   Decimal      @db.Decimal(10, 2)
   deliveryType DeliveryType @default(READY)
-
-  // Impostos do Item (Calculados pelo TaxProfile na hora da venda)
-  icmsRate Decimal @default(0) @db.Decimal(5, 2)
-  ipiRate  Decimal @default(0) @db.Decimal(5, 2)
+  icmsRate     Decimal      @default(0) @db.Decimal(5, 2)
+  ipiRate      Decimal      @default(0) @db.Decimal(5, 2)
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
 
   @@map("order_items")
 }
 
 model OrderPayment {
-  id String @id @default(uuid())
-
-  // Segurança Multi-tenant
-  tenantId String
-
-  // Vínculo com o Pedido
-  orderId String
-
-  // Vínculo com a Forma de Pagamento escolhida pelo Lojista (Ex: "Cartão Stone")
+  id                    String              @id @default(uuid())
+  tenantId              String
+  orderId               String
   tenantPaymentMethodId String
-
-  // --- Valores Base ---
-  baseAmount   Decimal @db.Decimal(10, 2) // O valor bruto que o cliente quis passar aqui (Ex: R$ 800)
-  installments Int     @default(1) // Em quantas vezes ele dividiu (Ex: 3)
-
-  // --- Congelamento Financeiro (Imutabilidade) ---
-  // Salva exatamente o que aconteceu no momento da venda, caso o dono mude a taxa da maquininha no futuro
-  discountApplied Decimal @default(0) @db.Decimal(10, 2) // Ex: R$ 20 de desconto no Pix
-  feeApplied      Decimal @default(0) @db.Decimal(10, 2) // Ex: R$ 42,10 de repasse de juros do cartão
-  finalAmount     Decimal @db.Decimal(10, 2) // O valor líquido/final dessa fatia (Ex: R$ 842,10)
-
-  // --- Relacionamentos ---
-  tenant              Tenant              @relation(fields: [tenantId], references: [id])
-  order               Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  tenantPaymentMethod TenantPaymentMethod @relation(fields: [tenantPaymentMethodId], references: [id])
-
-  paymentTermId String?
-  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
-
-  // 🔗 A mágica do financeiro: 1 pagamento de cartão em 3x vai gerar 3 FinancialTitles aqui dentro
-  titles FinancialTitle[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  baseAmount            Decimal             @db.Decimal(10, 2)
+  installments          Int                 @default(1)
+  discountApplied       Decimal             @default(0) @db.Decimal(10, 2)
+  feeApplied            Decimal             @default(0) @db.Decimal(10, 2)
+  finalAmount           Decimal             @db.Decimal(10, 2)
+  paymentTermId         String?
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  titles                FinancialTitle[]
+  order                 Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentTerm           PaymentTerm?        @relation(fields: [paymentTermId], references: [id])
+  tenant                Tenant              @relation(fields: [tenantId], references: [id])
+  tenantPaymentMethod   TenantPaymentMethod @relation(fields: [tenantPaymentMethodId], references: [id])
 
   @@map("order_payments")
+}
+
+enum OrderStatus {
+  DRAFT
+  CONFIRMED
+  SEPARATION
+  INVOICED
+  CANCELED
+  COMPLETED
+}
+
+enum DeliveryType {
+  READY
+  PRE_ORDER
 }

@@ -11,7 +11,9 @@ export interface ProductEntity {
   ean: string | null;
   description: string | null;
   unit: string;
-  ncm: string;
+  ncmCode: string;
+  cestCode: string | null;
+  cfopCode: string | null;
   costPrice: number;
   salePrice: number;
   minStock: number;
@@ -61,7 +63,9 @@ export interface CreateProductInput {
   ean?: string;
   description?: string;
   unit?: string;
-  ncm?: string;
+  ncmCode?: string;
+  cestCode?: string;
+  cfopCode?: string;
   costPrice: number;
   salePrice?: number;
   minStock?: number;
@@ -83,7 +87,9 @@ export interface UpdateProductInput {
   ean?: string;
   description?: string;
   unit?: string;
-  ncm?: string;
+  ncmCode?: string;
+  cestCode?: string;
+  cfopCode?: string;
   costPrice?: number;
   salePrice?: number;
   minStock?: number;

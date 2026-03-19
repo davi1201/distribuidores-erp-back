@@ -1,0 +1,2148 @@
+[
+  {
+    "id": 1,
+    "code": "01.001.00",
+    "description": "Catalisadores em colmeia cerâmica ou metálica para conversão catalítica de gases de escape de veículos automotores"
+  },
+  {
+    "id": 2,
+    "code": "01.002.00",
+    "description": "Tubos e seus acessórios (por exemplo, juntas, cotovelos, flanges, uniões), de plástico, para uso em sistemas de freios, combustível, arrefecimento, escapamento e emissão de poluentes"
+  },
+  {
+    "id": 3,
+    "code": "01.003.00",
+    "description": "Protetores de borracha (parachoques) para veículos"
+  },
+  {
+    "id": 4,
+    "code": "01.004.00",
+    "description": "Reservatórios de óleo do motor"
+  },
+  {
+    "id": 5,
+    "code": "01.005.00",
+    "description": "Embreagem e seus componentes"
+  },
+  {
+    "id": 6,
+    "code": "01.006.00",
+    "description": "Volantes e colunas de direção"
+  },
+  { "id": 7, "code": "01.007.00", "description": "Caixas de direção" },
+  { "id": 8, "code": "01.008.00", "description": "Barras e tubos de direção" },
+  { "id": 9, "code": "01.009.00", "description": "Articulações axiais" },
+  {
+    "id": 10,
+    "code": "01.010.00",
+    "description": "Articulações de direção (terminais de direção)"
+  },
+  {
+    "id": 11,
+    "code": "01.011.00",
+    "description": "Bieletas de suspensão e direção"
+  },
+  { "id": 12, "code": "01.012.00", "description": "Braços de suspensão" },
+  {
+    "id": 13,
+    "code": "01.013.00",
+    "description": "Buchas de suspensão e direção, de borracha ou plástico"
+  },
+  { "id": 14, "code": "01.014.00", "description": "Kits de buchas" },
+  {
+    "id": 15,
+    "code": "01.015.00",
+    "description": "Amortecedores de suspensão"
+  },
+  { "id": 16, "code": "01.016.00", "description": "Kits de amortecedores" },
+  { "id": 17, "code": "01.017.00", "description": "Molas de suspensão" },
+  {
+    "id": 18,
+    "code": "01.018.00",
+    "description": "Estabilizadores (barras estabilizadoras)"
+  },
+  { "id": 19, "code": "01.019.00", "description": "Rolamentos de roda" },
+  { "id": 20, "code": "01.020.00", "description": "Cubos de roda" },
+  { "id": 21, "code": "01.021.00", "description": "Rodas de alumínio e aço" },
+  { "id": 22, "code": "01.022.00", "description": "Freios a disco - discos" },
+  {
+    "id": 23,
+    "code": "01.023.00",
+    "description": "Freios a tambor - tambores"
+  },
+  { "id": 24, "code": "01.024.00", "description": "Pastilhas de freio" },
+  { "id": 25, "code": "01.025.00", "description": "Lonas de freio" },
+  { "id": 26, "code": "01.026.00", "description": "Sapatas de freio" },
+  {
+    "id": 27,
+    "code": "01.027.00",
+    "description": "Cilindros de freio (mestre e auxiliar)"
+  },
+  {
+    "id": 28,
+    "code": "01.028.00",
+    "description": "Servofreios e seus componentes"
+  },
+  {
+    "id": 29,
+    "code": "01.029.00",
+    "description": "Pinças de freio e seus componentes"
+  },
+  { "id": 30, "code": "01.030.00", "description": "Fluido de freio" },
+  { "id": 31, "code": "01.031.00", "description": "Velas de ignição" },
+  { "id": 32, "code": "01.032.00", "description": "Bobinas de ignição" },
+  { "id": 33, "code": "01.033.00", "description": "Distribuidores de ignição" },
+  { "id": 34, "code": "01.034.00", "description": "Cabos de vela e ignição" },
+  {
+    "id": 35,
+    "code": "01.035.00",
+    "description": "Velas de aquecimento (velas de pré-aquecimento)"
+  },
+  {
+    "id": 36,
+    "code": "01.036.00",
+    "description": "Baterias de chumbo-ácido para veículos automotores"
+  },
+  {
+    "id": 37,
+    "code": "01.037.00",
+    "description": "Alternadores e componentes"
+  },
+  {
+    "id": 38,
+    "code": "01.038.00",
+    "description": "Motores de partida (starter)"
+  },
+  { "id": 39, "code": "01.039.00", "description": "Filtros de ar" },
+  { "id": 40, "code": "01.040.00", "description": "Filtros de combustível" },
+  { "id": 41, "code": "01.041.00", "description": "Filtros de óleo" },
+  {
+    "id": 42,
+    "code": "01.042.00",
+    "description": "Filtros de cabine (ar condicionado)"
+  },
+  {
+    "id": 43,
+    "code": "01.043.00",
+    "description": "Correias de transmissão (dentadas, trapezoidais e planas)"
+  },
+  { "id": 44, "code": "01.044.00", "description": "Correias de distribuição" },
+  {
+    "id": 45,
+    "code": "01.045.00",
+    "description": "Kits de distribuição (correia, tensor e bomba d'água)"
+  },
+  {
+    "id": 46,
+    "code": "01.046.00",
+    "description": "Tensores e polias tensoras"
+  },
+  { "id": 47, "code": "01.047.00", "description": "Correntes de distribuição" },
+  {
+    "id": 48,
+    "code": "01.048.00",
+    "description": "Radiadores de arrefecimento"
+  },
+  {
+    "id": 49,
+    "code": "01.049.00",
+    "description": "Ventiladores de arrefecimento e componentes"
+  },
+  { "id": 50, "code": "01.050.00", "description": "Bombas d'água do motor" },
+  {
+    "id": 51,
+    "code": "01.051.00",
+    "description": "Termostatos do arrefecimento"
+  },
+  {
+    "id": 52,
+    "code": "01.052.00",
+    "description": "Mangueiras de arrefecimento"
+  },
+  {
+    "id": 53,
+    "code": "01.053.00",
+    "description": "Juntas e kits de juntas do motor"
+  },
+  {
+    "id": 54,
+    "code": "01.054.00",
+    "description": "Retentores e vedações do motor e câmbio"
+  },
+  {
+    "id": 55,
+    "code": "01.055.00",
+    "description": "Bronzinas (casquilhos de mancal)"
+  },
+  {
+    "id": 56,
+    "code": "01.056.00",
+    "description": "Pistões e anéis de segmento"
+  },
+  { "id": 57, "code": "01.057.00", "description": "Camisas de cilindros" },
+  { "id": 58, "code": "01.058.00", "description": "Válvulas do motor" },
+  {
+    "id": 59,
+    "code": "01.059.00",
+    "description": "Virabrequim (eixo de manivela)"
+  },
+  {
+    "id": 60,
+    "code": "01.060.00",
+    "description": "Árvore de cames (eixo de comando de válvulas)"
+  },
+  { "id": 61, "code": "01.061.00", "description": "Bielas" },
+  { "id": 62, "code": "01.062.00", "description": "Bicos injetores" },
+  { "id": 63, "code": "01.063.00", "description": "Bombas injetoras" },
+  {
+    "id": 64,
+    "code": "01.064.00",
+    "description": "Bombas de combustível elétrica e mecânica"
+  },
+  {
+    "id": 65,
+    "code": "01.065.00",
+    "description": "Carburadores e componentes"
+  },
+  {
+    "id": 66,
+    "code": "01.066.00",
+    "description": "Sensores do motor e de emissões (lambda, MAP, MAF, temperatura etc.)"
+  },
+  {
+    "id": 67,
+    "code": "01.067.00",
+    "description": "Módulos de controle eletrônico (ECU/ECM)"
+  },
+  {
+    "id": 68,
+    "code": "01.068.00",
+    "description": "Compressores de ar condicionado veicular"
+  },
+  {
+    "id": 69,
+    "code": "01.069.00",
+    "description": "Condensadores de ar condicionado veicular"
+  },
+  {
+    "id": 70,
+    "code": "01.070.00",
+    "description": "Secadores e expansores de ar condicionado veicular"
+  },
+  {
+    "id": 71,
+    "code": "01.071.00",
+    "description": "Limpadores de para-brisa e componentes"
+  },
+  { "id": 72, "code": "01.072.00", "description": "Palhetas de para-brisa" },
+  {
+    "id": 73,
+    "code": "01.073.00",
+    "description": "Espelhos retrovisores externos e internos"
+  },
+  {
+    "id": 74,
+    "code": "01.074.00",
+    "description": "Vidros de janelas e para-brisa"
+  },
+  {
+    "id": 75,
+    "code": "01.075.00",
+    "description": "Fechaduras e travas de portas"
+  },
+  {
+    "id": 76,
+    "code": "01.076.00",
+    "description": "Maçanetas externas e internas"
+  },
+  { "id": 77, "code": "01.077.00", "description": "Cintos de segurança" },
+  {
+    "id": 78,
+    "code": "01.078.00",
+    "description": "Airbags e módulos de airbag"
+  },
+  {
+    "id": 79,
+    "code": "01.079.00",
+    "description": "Faróis, lanternas e luzes de sinalização"
+  },
+  {
+    "id": 80,
+    "code": "01.080.00",
+    "description": "Bulbos, lâmpadas e LEDs automotivos"
+  },
+  {
+    "id": 81,
+    "code": "01.081.00",
+    "description": "Velocímetros, tacômetros e instrumentos de painel"
+  },
+  {
+    "id": 82,
+    "code": "01.082.00",
+    "description": "Caixas de câmbio e componentes"
+  },
+  {
+    "id": 83,
+    "code": "01.083.00",
+    "description": "Semi-eixos e juntas homocinéticas"
+  },
+  { "id": 84, "code": "01.084.00", "description": "Diferencial e componentes" },
+  {
+    "id": 85,
+    "code": "01.085.00",
+    "description": "Cruzetas e garfos de cardã"
+  },
+  {
+    "id": 86,
+    "code": "01.086.00",
+    "description": "Escapamentos e silenciosos"
+  },
+  {
+    "id": 87,
+    "code": "01.087.00",
+    "description": "Intercoolers e turbocompressores"
+  },
+  { "id": 88, "code": "01.088.00", "description": "Chicotes elétricos" },
+  {
+    "id": 89,
+    "code": "01.089.00",
+    "description": "Conectores elétricos automotivos"
+  },
+  {
+    "id": 90,
+    "code": "01.090.00",
+    "description": "Colunas de porta e revestimentos estruturais"
+  },
+
+  { "id": 91, "code": "02.001.00", "description": "Vodca" },
+  { "id": 92, "code": "02.002.00", "description": "Uísque" },
+  { "id": 93, "code": "02.003.00", "description": "Rum e tafia" },
+  {
+    "id": 94,
+    "code": "02.004.00",
+    "description": "Cachaça e aguardente de cana"
+  },
+  {
+    "id": 95,
+    "code": "02.005.00",
+    "description": "Aguardentes simples de frutas, bagaceiras ou grapa"
+  },
+  { "id": 96, "code": "02.006.00", "description": "Genebra e gim" },
+  { "id": 97, "code": "02.007.00", "description": "Tequila e mezcal" },
+  {
+    "id": 98,
+    "code": "02.008.00",
+    "description": "Conhaque, armagnac e pisco"
+  },
+  { "id": 99, "code": "02.009.00", "description": "Licores" },
+  {
+    "id": 100,
+    "code": "02.010.00",
+    "description": "Bebidas espirituosas de cereais (exceto uísque)"
+  },
+  { "id": 101, "code": "02.011.00", "description": "Vinhos de uvas frescas" },
+  {
+    "id": 102,
+    "code": "02.012.00",
+    "description": "Vinhos espumantes e espumosos"
+  },
+  { "id": 103, "code": "02.013.00", "description": "Vinhos licorosos" },
+  { "id": 104, "code": "02.014.00", "description": "Sidra e perada" },
+  {
+    "id": 105,
+    "code": "02.015.00",
+    "description": "Vermutes e outros vinhos de uvas frescas aromatizados"
+  },
+  {
+    "id": 106,
+    "code": "02.016.00",
+    "description": "Outras bebidas fermentadas"
+  },
+  {
+    "id": 107,
+    "code": "02.017.00",
+    "description": "Malte não fermentado (exceto cerveja)"
+  },
+  {
+    "id": 108,
+    "code": "02.018.00",
+    "description": "Cervejas sem álcool - bebidas alcoólicas abaixo de 0,5%GL"
+  },
+
+  {
+    "id": 109,
+    "code": "03.001.00",
+    "description": "Cerveja em garrafa de vidro retornável com volume inferior ou igual a 600 ml"
+  },
+  {
+    "id": 110,
+    "code": "03.002.00",
+    "description": "Cerveja em garrafa de vidro retornável com volume superior a 600 ml"
+  },
+  {
+    "id": 111,
+    "code": "03.003.00",
+    "description": "Cerveja em garrafa de vidro não retornável"
+  },
+  { "id": 112, "code": "03.004.00", "description": "Cerveja em lata" },
+  {
+    "id": 113,
+    "code": "03.005.00",
+    "description": "Cerveja em embalagem de plástico"
+  },
+  {
+    "id": 114,
+    "code": "03.006.00",
+    "description": "Cerveja em barril, chopeira ou tanque"
+  },
+  { "id": 115, "code": "03.007.00", "description": "Chope" },
+  {
+    "id": 116,
+    "code": "03.008.00",
+    "description": "Refrigerante em garrafa PET retornável"
+  },
+  {
+    "id": 117,
+    "code": "03.009.00",
+    "description": "Refrigerante em garrafa PET não retornável"
+  },
+  {
+    "id": 118,
+    "code": "03.010.00",
+    "description": "Refrigerante em garrafa de vidro"
+  },
+  { "id": 119, "code": "03.011.00", "description": "Refrigerante em lata" },
+  {
+    "id": 120,
+    "code": "03.012.00",
+    "description": "Refrigerante em embalagem TetraPak ou cartonada"
+  },
+  {
+    "id": 121,
+    "code": "03.013.00",
+    "description": "Água mineral natural com gás em garrafa PET"
+  },
+  {
+    "id": 122,
+    "code": "03.014.00",
+    "description": "Água mineral natural sem gás em garrafa PET"
+  },
+  {
+    "id": 123,
+    "code": "03.015.00",
+    "description": "Água mineral natural em garrafa de vidro"
+  },
+  {
+    "id": 124,
+    "code": "03.016.00",
+    "description": "Água mineral natural em copo plástico"
+  },
+  {
+    "id": 125,
+    "code": "03.017.00",
+    "description": "Água mineral natural em galão retornável (20 litros)"
+  },
+  {
+    "id": 126,
+    "code": "03.018.00",
+    "description": "Isotônico em garrafa ou lata"
+  },
+  { "id": 127, "code": "03.019.00", "description": "Energético em lata" },
+  { "id": 128, "code": "03.020.00", "description": "Energético em garrafa" },
+  {
+    "id": 129,
+    "code": "03.021.00",
+    "description": "Suco de fruta em embalagem TetraPak ou cartonada"
+  },
+  {
+    "id": 130,
+    "code": "03.022.00",
+    "description": "Suco de fruta em garrafa PET ou vidro"
+  },
+  { "id": 131, "code": "03.023.00", "description": "Néctares de frutas" },
+  {
+    "id": 132,
+    "code": "03.024.00",
+    "description": "Bebidas prontas à base de chá e mate"
+  },
+  {
+    "id": 133,
+    "code": "03.025.00",
+    "description": "Bebidas prontas à base de café"
+  },
+  {
+    "id": 134,
+    "code": "03.026.00",
+    "description": "Bebidas mistas de frutas e vegetais"
+  },
+  {
+    "id": 135,
+    "code": "03.027.00",
+    "description": "Caldo de cana industrializado"
+  },
+  {
+    "id": 136,
+    "code": "03.028.00",
+    "description": "Shots e drinks prontos com baixo teor alcoólico"
+  },
+
+  { "id": 137, "code": "04.001.00", "description": "Cigarros contendo tabaco" },
+  { "id": 138, "code": "04.002.00", "description": "Cigarrilhas e charutos" },
+  {
+    "id": 139,
+    "code": "04.003.00",
+    "description": "Cigarros de papel e filtros"
+  },
+  {
+    "id": 140,
+    "code": "04.004.00",
+    "description": "Tabaco para cigarros (picado, cortado)"
+  },
+  {
+    "id": 141,
+    "code": "04.005.00",
+    "description": "Fumo em corda, fumo de rolo e fumo de mascar"
+  },
+  { "id": 142, "code": "04.006.00", "description": "Fumo para cachimbo" },
+  {
+    "id": 143,
+    "code": "04.007.00",
+    "description": "Rapé e outros produtos de tabaco sem combustão"
+  },
+  {
+    "id": 144,
+    "code": "04.008.00",
+    "description": "Cigarros eletrônicos (pods e refis de nicotina)"
+  },
+  {
+    "id": 145,
+    "code": "04.009.00",
+    "description": "Tabaco para narguilé (shisha)"
+  },
+
+  {
+    "id": 146,
+    "code": "05.001.00",
+    "description": "Cimento Portland comum (CP I)"
+  },
+  {
+    "id": 147,
+    "code": "05.002.00",
+    "description": "Cimento Portland composto (CP II)"
+  },
+  {
+    "id": 148,
+    "code": "05.003.00",
+    "description": "Cimento Portland de alto-forno (CP III)"
+  },
+  {
+    "id": 149,
+    "code": "05.004.00",
+    "description": "Cimento Portland pozolânico (CP IV)"
+  },
+  {
+    "id": 150,
+    "code": "05.005.00",
+    "description": "Cimento Portland de alta resistência inicial (CP V - ARI)"
+  },
+  {
+    "id": 151,
+    "code": "05.006.00",
+    "description": "Cimento Portland resistente a sulfatos"
+  },
+  { "id": 152, "code": "05.007.00", "description": "Cimento Portland branco" },
+  {
+    "id": 153,
+    "code": "05.008.00",
+    "description": "Cimento de aluminato de cálcio"
+  },
+  {
+    "id": 154,
+    "code": "05.009.00",
+    "description": "Outros cimentos hidráulicos"
+  },
+
+  { "id": 155, "code": "06.001.00", "description": "Gasolina automotiva" },
+  { "id": 156, "code": "06.002.00", "description": "Gasolina de aviação" },
+  { "id": 157, "code": "06.003.00", "description": "Óleo diesel" },
+  {
+    "id": 158,
+    "code": "06.004.00",
+    "description": "Óleo combustível (bunker)"
+  },
+  {
+    "id": 159,
+    "code": "06.005.00",
+    "description": "Querosene de aviação (QAV/Jet A-1)"
+  },
+  { "id": 160, "code": "06.006.00", "description": "Querosene iluminante" },
+  {
+    "id": 161,
+    "code": "06.007.00",
+    "description": "Gás liquefeito de petróleo (GLP) em botijão P13"
+  },
+  {
+    "id": 162,
+    "code": "06.008.00",
+    "description": "Gás liquefeito de petróleo (GLP) em outros recipientes"
+  },
+  {
+    "id": 163,
+    "code": "06.009.00",
+    "description": "Gás natural veicular (GNV)"
+  },
+  {
+    "id": 164,
+    "code": "06.010.00",
+    "description": "Álcool etílico hidratado combustível (AEHC)"
+  },
+  {
+    "id": 165,
+    "code": "06.011.00",
+    "description": "Álcool etílico anidro combustível (AEAC)"
+  },
+  { "id": 166, "code": "06.012.00", "description": "Biodiesel (B100)" },
+  {
+    "id": 167,
+    "code": "06.013.00",
+    "description": "Lubrificantes derivados de petróleo"
+  },
+  {
+    "id": 168,
+    "code": "06.014.00",
+    "description": "Óleos lubrificantes sintéticos e semissintéticos"
+  },
+  { "id": 169, "code": "06.015.00", "description": "Graxas lubrificantes" },
+  {
+    "id": 170,
+    "code": "06.016.00",
+    "description": "Aditivos para combustíveis"
+  },
+  { "id": 171, "code": "06.017.00", "description": "Fluido arla 32 (AdBlue)" },
+
+  {
+    "id": 172,
+    "code": "07.001.00",
+    "description": "Energia elétrica residencial"
+  },
+  {
+    "id": 173,
+    "code": "07.002.00",
+    "description": "Energia elétrica industrial"
+  },
+  {
+    "id": 174,
+    "code": "07.003.00",
+    "description": "Energia elétrica comercial"
+  },
+  { "id": 175, "code": "07.004.00", "description": "Energia elétrica rural" },
+
+  {
+    "id": 176,
+    "code": "08.001.00",
+    "description": "Ferramentas de mão, manuais (martelos, chaves, alicates etc.)"
+  },
+  { "id": 177, "code": "08.002.00", "description": "Serras manuais" },
+  { "id": 178, "code": "08.003.00", "description": "Limas e grosas" },
+  {
+    "id": 179,
+    "code": "08.004.00",
+    "description": "Ferramentas de corte de metais (brocas, fresas, machos etc.)"
+  },
+  {
+    "id": 180,
+    "code": "08.005.00",
+    "description": "Chaves de fenda e parafuso"
+  },
+  { "id": 181, "code": "08.006.00", "description": "Alicates e tenaz" },
+  { "id": 182, "code": "08.007.00", "description": "Ferramentas pneumáticas" },
+  {
+    "id": 183,
+    "code": "08.008.00",
+    "description": "Ferramentas elétricas portáteis (furadeiras, parafusadeiras, serras)"
+  },
+  {
+    "id": 184,
+    "code": "08.009.00",
+    "description": "Esmerilhadeiras e politrizes angulares"
+  },
+  {
+    "id": 185,
+    "code": "08.010.00",
+    "description": "Conjuntos de ferramentas (kits)"
+  },
+  {
+    "id": 186,
+    "code": "08.011.00",
+    "description": "Caixas e maletas para ferramentas"
+  },
+  {
+    "id": 187,
+    "code": "08.012.00",
+    "description": "Maçaricos e equipamentos de soldagem portáteis"
+  },
+
+  {
+    "id": 188,
+    "code": "09.001.00",
+    "description": "Filmes fotográficos não revelados, sensíveis à luz"
+  },
+  { "id": 189, "code": "09.002.00", "description": "Filmes para radiografia" },
+  {
+    "id": 190,
+    "code": "09.003.00",
+    "description": "Chapas e filmes para fotogravura"
+  },
+  {
+    "id": 191,
+    "code": "09.004.00",
+    "description": "Cartuchos de filme fotográfico"
+  },
+
+  { "id": 192, "code": "10.001.00", "description": "Lâmpadas incandescentes" },
+  { "id": 193, "code": "10.002.00", "description": "Lâmpadas halógenas" },
+  {
+    "id": 194,
+    "code": "10.003.00",
+    "description": "Lâmpadas fluorescentes tubulares (T5, T8, T10)"
+  },
+  {
+    "id": 195,
+    "code": "10.004.00",
+    "description": "Lâmpadas fluorescentes compactas (PL, Dulux)"
+  },
+  {
+    "id": 196,
+    "code": "10.005.00",
+    "description": "Lâmpadas de vapor de mercúrio"
+  },
+  {
+    "id": 197,
+    "code": "10.006.00",
+    "description": "Lâmpadas de vapor de sódio"
+  },
+  {
+    "id": 198,
+    "code": "10.007.00",
+    "description": "Lâmpadas de vapor metálico"
+  },
+  {
+    "id": 199,
+    "code": "10.008.00",
+    "description": "Lâmpadas LED (bulbo, tubular, PAR etc.)"
+  },
+  {
+    "id": 200,
+    "code": "10.009.00",
+    "description": "Reatores para lâmpadas fluorescentes"
+  },
+  {
+    "id": 201,
+    "code": "10.010.00",
+    "description": "Starter para lâmpadas fluorescentes"
+  },
+  {
+    "id": 202,
+    "code": "10.011.00",
+    "description": "Drivers para lâmpadas LED"
+  },
+  {
+    "id": 203,
+    "code": "10.012.00",
+    "description": "Luminárias e armaduras para lâmpadas"
+  },
+
+  { "id": 204, "code": "11.001.00", "description": "Tijolos cerâmicos" },
+  { "id": 205, "code": "11.002.00", "description": "Telhas cerâmicas" },
+  {
+    "id": 206,
+    "code": "11.003.00",
+    "description": "Blocos cerâmicos (vedação e estrutural)"
+  },
+  {
+    "id": 207,
+    "code": "11.004.00",
+    "description": "Lajotas e lajes cerâmicas"
+  },
+  {
+    "id": 208,
+    "code": "11.005.00",
+    "description": "Revestimentos cerâmicos (azulejos e pisos)"
+  },
+  { "id": 209, "code": "11.006.00", "description": "Porcelanatos" },
+  {
+    "id": 210,
+    "code": "11.007.00",
+    "description": "Ardósia e outras pedras ornamentais naturais"
+  },
+  {
+    "id": 211,
+    "code": "11.008.00",
+    "description": "Mármore e granito em chapas e blocos"
+  },
+  {
+    "id": 212,
+    "code": "11.009.00",
+    "description": "Areia, pedra britada e cascalho"
+  },
+  { "id": 213, "code": "11.010.00", "description": "Cal hidratada e cal viva" },
+  {
+    "id": 214,
+    "code": "11.011.00",
+    "description": "Argamassa industrializada"
+  },
+  { "id": 215, "code": "11.012.00", "description": "Reboco industrializado" },
+  { "id": 216, "code": "11.013.00", "description": "Chapisco industrializado" },
+  {
+    "id": 217,
+    "code": "11.014.00",
+    "description": "Gesso e produtos à base de gesso"
+  },
+  {
+    "id": 218,
+    "code": "11.015.00",
+    "description": "Chapas de gesso acartonado (drywall)"
+  },
+  { "id": 219, "code": "11.016.00", "description": "Chapas de fibrocimento" },
+  { "id": 220, "code": "11.017.00", "description": "Telhas de fibrocimento" },
+  {
+    "id": 221,
+    "code": "11.018.00",
+    "description": "Telhas de concreto e metálicas"
+  },
+  {
+    "id": 222,
+    "code": "11.019.00",
+    "description": "Perfis de aço (vigas, cantoneiras, chapas)"
+  },
+  {
+    "id": 223,
+    "code": "11.020.00",
+    "description": "Tubos de PVC para construção civil"
+  },
+  { "id": 224, "code": "11.021.00", "description": "Conexões de PVC e CPVC" },
+  {
+    "id": 225,
+    "code": "11.022.00",
+    "description": "Caixas d'água, reservatórios plásticos"
+  },
+  { "id": 226, "code": "11.023.00", "description": "Forros de PVC e alumínio" },
+  {
+    "id": 227,
+    "code": "11.024.00",
+    "description": "Pisos laminados de madeira"
+  },
+  {
+    "id": 228,
+    "code": "11.025.00",
+    "description": "Pisos vinílicos e emborrachados"
+  },
+  {
+    "id": 229,
+    "code": "11.026.00",
+    "description": "Impermeabilizantes e vedantes para construção"
+  },
+  {
+    "id": 230,
+    "code": "11.027.00",
+    "description": "Mantas de impermeabilização"
+  },
+  {
+    "id": 231,
+    "code": "11.028.00",
+    "description": "Aditivos e retardadores de cimento"
+  },
+  {
+    "id": 232,
+    "code": "11.029.00",
+    "description": "Barras de aço para armação (aço CA-25, CA-50, CA-60)"
+  },
+  {
+    "id": 233,
+    "code": "11.030.00",
+    "description": "Telas de aço soldadas para armação"
+  },
+  {
+    "id": 234,
+    "code": "11.031.00",
+    "description": "Fios e arames de aço para construção"
+  },
+  {
+    "id": 235,
+    "code": "11.032.00",
+    "description": "Grades e telas de aço ornamentais"
+  },
+  {
+    "id": 236,
+    "code": "11.033.00",
+    "description": "Portas, janelas e esquadrias de alumínio"
+  },
+  {
+    "id": 237,
+    "code": "11.034.00",
+    "description": "Portas, janelas e esquadrias de PVC"
+  },
+  {
+    "id": 238,
+    "code": "11.035.00",
+    "description": "Vidros planos (float, temperado, laminado)"
+  },
+  { "id": 239, "code": "11.036.00", "description": "Persianas e venezianas" },
+  {
+    "id": 240,
+    "code": "11.037.00",
+    "description": "Fechaduras, dobradiças e ferragens para construção"
+  },
+  {
+    "id": 241,
+    "code": "11.038.00",
+    "description": "Louças sanitárias (vasos, pias, bidês)"
+  },
+  {
+    "id": 242,
+    "code": "11.039.00",
+    "description": "Metais sanitários (torneiras, misturadores, registros)"
+  },
+  {
+    "id": 243,
+    "code": "11.040.00",
+    "description": "Tanques e cubas de inox e aço"
+  },
+  {
+    "id": 244,
+    "code": "11.041.00",
+    "description": "Banheiras e boxes de acrílico"
+  },
+  {
+    "id": 245,
+    "code": "11.042.00",
+    "description": "Sifões, ralos, válvulas e acessórios sanitários"
+  },
+  {
+    "id": 246,
+    "code": "11.043.00",
+    "description": "Caixas de descarga acoplada e válvulas de descarga"
+  },
+  {
+    "id": 247,
+    "code": "11.044.00",
+    "description": "Aquecedores de água (elétrico, gás, solar)"
+  },
+  {
+    "id": 248,
+    "code": "11.045.00",
+    "description": "Bombas e sistemas de pressurização de água"
+  },
+
+  {
+    "id": 249,
+    "code": "12.001.00",
+    "description": "Água sanitária (hipoclorito de sódio)"
+  },
+  {
+    "id": 250,
+    "code": "12.002.00",
+    "description": "Alvejante e branqueador têxtil"
+  },
+  {
+    "id": 251,
+    "code": "12.003.00",
+    "description": "Desinfetante domissanitário"
+  },
+  {
+    "id": 252,
+    "code": "12.004.00",
+    "description": "Detergente líquido para louças"
+  },
+  { "id": 253, "code": "12.005.00", "description": "Sabão em pó para roupas" },
+  { "id": 254, "code": "12.006.00", "description": "Sabão em barra" },
+  { "id": 255, "code": "12.007.00", "description": "Amaciante de roupas" },
+  {
+    "id": 256,
+    "code": "12.008.00",
+    "description": "Limpador multiuso doméstico"
+  },
+  {
+    "id": 257,
+    "code": "12.009.00",
+    "description": "Desengordurante e removedor de gordura"
+  },
+  {
+    "id": 258,
+    "code": "12.010.00",
+    "description": "Limpa-vidros e superfícies de vidro"
+  },
+  {
+    "id": 259,
+    "code": "12.011.00",
+    "description": "Limpa-fornos e produtos abrasivos"
+  },
+  { "id": 260, "code": "12.012.00", "description": "Cera para pisos e móveis" },
+  {
+    "id": 261,
+    "code": "12.013.00",
+    "description": "Tira-manchas e pré-lavagem"
+  },
+  {
+    "id": 262,
+    "code": "12.014.00",
+    "description": "Inseticida doméstico (spray, pastilha, líquido)"
+  },
+  {
+    "id": 263,
+    "code": "12.015.00",
+    "description": "Raticida e rodenticidas de uso doméstico"
+  },
+  {
+    "id": 264,
+    "code": "12.016.00",
+    "description": "Repelente de insetos para uso humano"
+  },
+  {
+    "id": 265,
+    "code": "12.017.00",
+    "description": "Aromatizantes e desodorizadores de ambiente"
+  },
+
+  {
+    "id": 266,
+    "code": "13.001.00",
+    "description": "Fios de cobre isolados para instalações elétricas"
+  },
+  {
+    "id": 267,
+    "code": "13.002.00",
+    "description": "Cabos de cobre isolados para instalações elétricas"
+  },
+  {
+    "id": 268,
+    "code": "13.003.00",
+    "description": "Cabos de alumínio isolados"
+  },
+  {
+    "id": 269,
+    "code": "13.004.00",
+    "description": "Disjuntores unipolares, bipolares e tripolares"
+  },
+  {
+    "id": 270,
+    "code": "13.005.00",
+    "description": "Interruptores e tomadas elétricas"
+  },
+  {
+    "id": 271,
+    "code": "13.006.00",
+    "description": "Caixas de passagem e embutir elétricas"
+  },
+  {
+    "id": 272,
+    "code": "13.007.00",
+    "description": "Eletrodutos de PVC e metálicos"
+  },
+  {
+    "id": 273,
+    "code": "13.008.00",
+    "description": "Quadros de distribuição elétrica"
+  },
+  {
+    "id": 274,
+    "code": "13.009.00",
+    "description": "Transformadores e auto-transformadores"
+  },
+  {
+    "id": 275,
+    "code": "13.010.00",
+    "description": "Chaves e seccionadores elétricos"
+  },
+  {
+    "id": 276,
+    "code": "13.011.00",
+    "description": "Fusíveis e porta-fusíveis"
+  },
+  {
+    "id": 277,
+    "code": "13.012.00",
+    "description": "Estabilizadores de tensão e no-breaks (UPS)"
+  },
+  { "id": 278, "code": "13.013.00", "description": "Motores elétricos" },
+  {
+    "id": 279,
+    "code": "13.014.00",
+    "description": "Geradores e grupos-motor-geradores"
+  },
+  { "id": 280, "code": "13.015.00", "description": "Inversores de frequência" },
+  {
+    "id": 281,
+    "code": "13.016.00",
+    "description": "Painéis fotovoltaicos (módulos solares)"
+  },
+
+  {
+    "id": 282,
+    "code": "14.001.00",
+    "description": "Medicamentos de referência (ético) uso humano"
+  },
+  {
+    "id": 283,
+    "code": "14.002.00",
+    "description": "Medicamentos genéricos uso humano"
+  },
+  {
+    "id": 284,
+    "code": "14.003.00",
+    "description": "Medicamentos similares uso humano"
+  },
+  {
+    "id": 285,
+    "code": "14.004.00",
+    "description": "Soros e vacinas de uso humano"
+  },
+  {
+    "id": 286,
+    "code": "14.005.00",
+    "description": "Hemocomponentes e hemoderivados"
+  },
+  {
+    "id": 287,
+    "code": "14.006.00",
+    "description": "Produtos de diagnóstico in vitro (testes rápidos, kits)"
+  },
+  {
+    "id": 288,
+    "code": "14.007.00",
+    "description": "Contraceptivos (pílulas, injeções, dispositivos)"
+  },
+  {
+    "id": 289,
+    "code": "14.008.00",
+    "description": "Fraldas descartáveis infantis e adulto"
+  },
+  {
+    "id": 290,
+    "code": "14.009.00",
+    "description": "Absorventes higiênicos internos e externos"
+  },
+  { "id": 291, "code": "14.010.00", "description": "Preservativos" },
+  {
+    "id": 292,
+    "code": "14.011.00",
+    "description": "Seringas e agulhas de uso médico"
+  },
+  {
+    "id": 293,
+    "code": "14.012.00",
+    "description": "Luvas cirúrgicas e de procedimento"
+  },
+  {
+    "id": 294,
+    "code": "14.013.00",
+    "description": "Curativos, ataduras, gazes e bandagens"
+  },
+  {
+    "id": 295,
+    "code": "14.014.00",
+    "description": "Cateteres e sondas de uso médico"
+  },
+  {
+    "id": 296,
+    "code": "14.015.00",
+    "description": "Esparadrapo e fita cirúrgica"
+  },
+  { "id": 297, "code": "14.016.00", "description": "Algodão hidrófilo" },
+  { "id": 298, "code": "14.017.00", "description": "Termômetros clínicos" },
+  { "id": 299, "code": "14.018.00", "description": "Estetoscópios" },
+  {
+    "id": 300,
+    "code": "14.019.00",
+    "description": "Esfigmomanômetros (aparelhos de pressão)"
+  },
+  {
+    "id": 301,
+    "code": "14.020.00",
+    "description": "Glicosímetros e tiras reagentes para glicemia"
+  },
+  { "id": 302, "code": "14.021.00", "description": "Oxímetros de pulso" },
+  {
+    "id": 303,
+    "code": "14.022.00",
+    "description": "Nebulizadores e inaladores"
+  },
+  {
+    "id": 304,
+    "code": "14.023.00",
+    "description": "Cadeiras de rodas e andadores"
+  },
+  { "id": 305, "code": "14.024.00", "description": "Muletas e bengalas" },
+
+  {
+    "id": 306,
+    "code": "15.001.00",
+    "description": "Papel de imprimir não revestido em folhas"
+  },
+  {
+    "id": 307,
+    "code": "15.002.00",
+    "description": "Papel de imprimir não revestido em bobinas"
+  },
+  {
+    "id": 308,
+    "code": "15.003.00",
+    "description": "Papel couché (revestido) em folhas"
+  },
+  {
+    "id": 309,
+    "code": "15.004.00",
+    "description": "Papel kraft e papel-cartão"
+  },
+  {
+    "id": 310,
+    "code": "15.005.00",
+    "description": "Papelão ondulado e suas chapas"
+  },
+  { "id": 311, "code": "15.006.00", "description": "Embalagens de papelão" },
+  { "id": 312, "code": "15.007.00", "description": "Sacos e sacolas de papel" },
+  {
+    "id": 313,
+    "code": "15.008.00",
+    "description": "Plástico filme de PVC e polietileno (uso alimentar)"
+  },
+  {
+    "id": 314,
+    "code": "15.009.00",
+    "description": "Embalagens plásticas flexíveis"
+  },
+  {
+    "id": 315,
+    "code": "15.010.00",
+    "description": "Recipientes plásticos rígidos para embalagem"
+  },
+  {
+    "id": 316,
+    "code": "15.011.00",
+    "description": "Produtos de vidro para embalagem (frascos, potes, garrafas)"
+  },
+  {
+    "id": 317,
+    "code": "15.012.00",
+    "description": "Embalagens de vidro para conservas"
+  },
+  {
+    "id": 318,
+    "code": "15.013.00",
+    "description": "Laminados cerâmicos para fachadas e pisos especiais"
+  },
+
+  {
+    "id": 319,
+    "code": "16.001.00",
+    "description": "Pneumáticos novos para automóveis de passageiros"
+  },
+  {
+    "id": 320,
+    "code": "16.002.00",
+    "description": "Pneumáticos novos para veículos de carga e ônibus"
+  },
+  {
+    "id": 321,
+    "code": "16.003.00",
+    "description": "Pneumáticos novos para motocicletas e ciclomotores"
+  },
+  {
+    "id": 322,
+    "code": "16.004.00",
+    "description": "Pneumáticos novos para máquinas agrícolas e florestais"
+  },
+  {
+    "id": 323,
+    "code": "16.005.00",
+    "description": "Pneumáticos novos para aeronaves"
+  },
+  {
+    "id": 324,
+    "code": "16.006.00",
+    "description": "Câmaras de ar de borracha"
+  },
+  {
+    "id": 325,
+    "code": "16.007.00",
+    "description": "Protetores de borracha (flaps)"
+  },
+  {
+    "id": 326,
+    "code": "16.008.00",
+    "description": "Pneumáticos recauchutados"
+  },
+  {
+    "id": 327,
+    "code": "16.009.00",
+    "description": "Bandas de rodagem para recauchutagem"
+  },
+
+  {
+    "id": 328,
+    "code": "17.001.00",
+    "description": "Carnes bovinas resfriadas e congeladas"
+  },
+  {
+    "id": 329,
+    "code": "17.002.00",
+    "description": "Carnes suínas resfriadas e congeladas"
+  },
+  {
+    "id": 330,
+    "code": "17.003.00",
+    "description": "Carnes de frango resfriadas e congeladas"
+  },
+  {
+    "id": 331,
+    "code": "17.004.00",
+    "description": "Peixes e frutos do mar resfriados e congelados"
+  },
+  {
+    "id": 332,
+    "code": "17.005.00",
+    "description": "Linguiças, salsichas e embutidos"
+  },
+  {
+    "id": 333,
+    "code": "17.006.00",
+    "description": "Presunto, bacon e outros defumados"
+  },
+  {
+    "id": 334,
+    "code": "17.007.00",
+    "description": "Leite pasteurizado, UHT e em pó"
+  },
+  {
+    "id": 335,
+    "code": "17.008.00",
+    "description": "Iogurte e bebidas lácteas"
+  },
+  { "id": 336, "code": "17.009.00", "description": "Queijos e requeijão" },
+  {
+    "id": 337,
+    "code": "17.010.00",
+    "description": "Manteiga, margarina e creme vegetal"
+  },
+  {
+    "id": 338,
+    "code": "17.011.00",
+    "description": "Óleos vegetais comestíveis (soja, milho, canola, girassol)"
+  },
+  { "id": 339, "code": "17.012.00", "description": "Azeite de oliva" },
+  { "id": 340, "code": "17.013.00", "description": "Arroz beneficiado" },
+  { "id": 341, "code": "17.014.00", "description": "Feijão" },
+  { "id": 342, "code": "17.015.00", "description": "Farinha de trigo" },
+  {
+    "id": 343,
+    "code": "17.016.00",
+    "description": "Macarrão e massas alimentícias"
+  },
+  { "id": 344, "code": "17.017.00", "description": "Pão, biscoito e bolacha" },
+  {
+    "id": 345,
+    "code": "17.018.00",
+    "description": "Açúcar refinado e cristal"
+  },
+  {
+    "id": 346,
+    "code": "17.019.00",
+    "description": "Sal de cozinha e sal iodado"
+  },
+  {
+    "id": 347,
+    "code": "17.020.00",
+    "description": "Café torrado e moído, solúvel e em cápsulas"
+  },
+  {
+    "id": 348,
+    "code": "17.021.00",
+    "description": "Chá em folhas, sachês e extratos"
+  },
+  {
+    "id": 349,
+    "code": "17.022.00",
+    "description": "Achocolatados em pó e líquido"
+  },
+  {
+    "id": 350,
+    "code": "17.023.00",
+    "description": "Chocolates, bombons e confeitos"
+  },
+  {
+    "id": 351,
+    "code": "17.024.00",
+    "description": "Balas, pirulitos e gomas de mascar"
+  },
+  { "id": 352, "code": "17.025.00", "description": "Salgadinhos e snacks" },
+  { "id": 353, "code": "17.026.00", "description": "Sorvetes e picolés" },
+  {
+    "id": 354,
+    "code": "17.027.00",
+    "description": "Temperos e condimentos (ketchup, maionese, mostarda)"
+  },
+  { "id": 355, "code": "17.028.00", "description": "Vinagre" },
+  {
+    "id": 356,
+    "code": "17.029.00",
+    "description": "Conservas vegetais em lata e vidro"
+  },
+  {
+    "id": 357,
+    "code": "17.030.00",
+    "description": "Conservas de peixes em lata (atum, sardinha)"
+  },
+  {
+    "id": 358,
+    "code": "17.031.00",
+    "description": "Polpas e sucos de frutas concentrados"
+  },
+  {
+    "id": 359,
+    "code": "17.032.00",
+    "description": "Frutas secas e oleaginosas (castanhas, amendoim, nozes)"
+  },
+  {
+    "id": 360,
+    "code": "17.033.00",
+    "description": "Alimentos para fins especiais (dietéticos, sem glúten, orgânicos)"
+  },
+  {
+    "id": 361,
+    "code": "17.034.00",
+    "description": "Produtos de panificação congelados (massas, pães)"
+  },
+  {
+    "id": 362,
+    "code": "17.035.00",
+    "description": "Pratos prontos e alimentos congelados"
+  },
+  {
+    "id": 363,
+    "code": "17.036.00",
+    "description": "Molhos de tomate industrializados"
+  },
+  { "id": 364, "code": "17.037.00", "description": "Maionese industrializada" },
+  {
+    "id": 365,
+    "code": "17.038.00",
+    "description": "Fermento biológico e químico"
+  },
+  { "id": 366, "code": "17.039.00", "description": "Gelatinas e pudins" },
+  { "id": 367, "code": "17.040.00", "description": "Farinha de milho e fubá" },
+  {
+    "id": 368,
+    "code": "17.041.00",
+    "description": "Farináceos (amido de milho, fécula de mandioca)"
+  },
+  {
+    "id": 369,
+    "code": "17.042.00",
+    "description": "Cereais matinais e granolas"
+  },
+  {
+    "id": 370,
+    "code": "17.043.00",
+    "description": "Barras de cereais e snacks saudáveis"
+  },
+  { "id": 371, "code": "17.044.00", "description": "Adoçantes e edulcorantes" },
+  { "id": 372, "code": "17.045.00", "description": "Mel de abelha" },
+  {
+    "id": 373,
+    "code": "17.046.00",
+    "description": "Suplementos alimentares (whey protein, creatina etc.)"
+  },
+
+  {
+    "id": 374,
+    "code": "18.001.00",
+    "description": "Cadernos escolares e universitários"
+  },
+  {
+    "id": 375,
+    "code": "18.002.00",
+    "description": "Agendas e blocos de anotações"
+  },
+  { "id": 376, "code": "18.003.00", "description": "Canetas esferográficas" },
+  {
+    "id": 377,
+    "code": "18.004.00",
+    "description": "Lápis de escrever e de cor"
+  },
+  { "id": 378, "code": "18.005.00", "description": "Lapiseiras e grafites" },
+  {
+    "id": 379,
+    "code": "18.006.00",
+    "description": "Marcadores, marca-textos e canetas hidrográficas"
+  },
+  { "id": 380, "code": "18.007.00", "description": "Borrachas de apagar" },
+  { "id": 381, "code": "18.008.00", "description": "Apontadores" },
+  {
+    "id": 382,
+    "code": "18.009.00",
+    "description": "Réguas, esquadros e compassos"
+  },
+  {
+    "id": 383,
+    "code": "18.010.00",
+    "description": "Corretivos líquidos e em fita"
+  },
+  {
+    "id": 384,
+    "code": "18.011.00",
+    "description": "Cola escolar e bastão de cola"
+  },
+  { "id": 385, "code": "18.012.00", "description": "Grampeadores e grampos" },
+  { "id": 386, "code": "18.013.00", "description": "Perfuradores de papel" },
+  { "id": 387, "code": "18.014.00", "description": "Pastas e fichários" },
+  { "id": 388, "code": "18.015.00", "description": "Envelopes e malotes" },
+  { "id": 389, "code": "18.016.00", "description": "Papel A4 para impressão" },
+  {
+    "id": 390,
+    "code": "18.017.00",
+    "description": "Papel fotográfico para impressoras"
+  },
+  {
+    "id": 391,
+    "code": "18.018.00",
+    "description": "Papel carbono e autocopiativo"
+  },
+  {
+    "id": 392,
+    "code": "18.019.00",
+    "description": "Fitas adesivas transparentes e coloridas"
+  },
+  {
+    "id": 393,
+    "code": "18.020.00",
+    "description": "Clipes, tachinhas e grampos de escritório"
+  },
+
+  {
+    "id": 394,
+    "code": "19.001.00",
+    "description": "Sabonetes em barra e líquidos"
+  },
+  { "id": 395, "code": "19.002.00", "description": "Xampus e condicionadores" },
+  {
+    "id": 396,
+    "code": "19.003.00",
+    "description": "Cremes e loções para o corpo"
+  },
+  {
+    "id": 397,
+    "code": "19.004.00",
+    "description": "Cremes e loções para o rosto"
+  },
+  { "id": 398, "code": "19.005.00", "description": "Protetor solar" },
+  {
+    "id": 399,
+    "code": "19.006.00",
+    "description": "Desodorantes e antitranspirantes (aerossol, roll-on, bastão)"
+  },
+  {
+    "id": 400,
+    "code": "19.007.00",
+    "description": "Perfumes e colônias (Eau de Parfum, Eau de Toilette)"
+  },
+  { "id": 401, "code": "19.008.00", "description": "Esmaltes para unhas" },
+  { "id": 402, "code": "19.009.00", "description": "Removedores de esmalte" },
+  {
+    "id": 403,
+    "code": "19.010.00",
+    "description": "Base, blush, sombra e outros produtos de maquiagem"
+  },
+  { "id": 404, "code": "19.011.00", "description": "Batons e gloss labial" },
+  {
+    "id": 405,
+    "code": "19.012.00",
+    "description": "Rímel, delineador e lápis de olho"
+  },
+  {
+    "id": 406,
+    "code": "19.013.00",
+    "description": "Pós compactos e soltos para rosto"
+  },
+  {
+    "id": 407,
+    "code": "19.014.00",
+    "description": "Tinturas para cabelo e descolorantes"
+  },
+  {
+    "id": 408,
+    "code": "19.015.00",
+    "description": "Produtos para permanente e alisamento capilar"
+  },
+  {
+    "id": 409,
+    "code": "19.016.00",
+    "description": "Géis, mousses e sprays para cabelo"
+  },
+  {
+    "id": 410,
+    "code": "19.017.00",
+    "description": "Creme de barbear e espuma de barbear"
+  },
+  {
+    "id": 411,
+    "code": "19.018.00",
+    "description": "Barbeadores, lâminas de barbear e depiladores"
+  },
+  { "id": 412, "code": "19.019.00", "description": "Cremes depilatórios" },
+  {
+    "id": 413,
+    "code": "19.020.00",
+    "description": "Pasta de dente e enxaguatório bucal"
+  },
+  {
+    "id": 414,
+    "code": "19.021.00",
+    "description": "Escovas de dente manuais e elétricas"
+  },
+  {
+    "id": 415,
+    "code": "19.022.00",
+    "description": "Fio dental e palito de dente"
+  },
+  {
+    "id": 416,
+    "code": "19.023.00",
+    "description": "Hastes flexíveis (cotonetes)"
+  },
+  {
+    "id": 417,
+    "code": "19.024.00",
+    "description": "Lenços umedecidos e de papel"
+  },
+  { "id": 418, "code": "19.025.00", "description": "Papel higiênico" },
+  {
+    "id": 419,
+    "code": "19.026.00",
+    "description": "Papel toalha e guardanapos de papel"
+  },
+  {
+    "id": 420,
+    "code": "19.027.00",
+    "description": "Produtos para bronzeamento artificial"
+  },
+  { "id": 421, "code": "19.028.00", "description": "Talco e pó para bebê" },
+  { "id": 422, "code": "19.029.00", "description": "Cremes e óleos para bebê" },
+  { "id": 423, "code": "19.030.00", "description": "Loções pós-barba" },
+  {
+    "id": 424,
+    "code": "19.031.00",
+    "description": "Esfoliantes corporais e faciais"
+  },
+  {
+    "id": 425,
+    "code": "19.032.00",
+    "description": "Máscaras capilares e tratamentos intensivos"
+  },
+
+  { "id": 426, "code": "20.001.00", "description": "Televisores" },
+  { "id": 427, "code": "20.002.00", "description": "Monitores de vídeo" },
+  { "id": 428, "code": "20.003.00", "description": "Projetores (data show)" },
+  {
+    "id": 429,
+    "code": "20.004.00",
+    "description": "Computadores desktop e all-in-one"
+  },
+  { "id": 430, "code": "20.005.00", "description": "Notebooks e ultrabooks" },
+  { "id": 431, "code": "20.006.00", "description": "Tablets" },
+  { "id": 432, "code": "20.007.00", "description": "Smartphones" },
+  {
+    "id": 433,
+    "code": "20.008.00",
+    "description": "Telefones celulares simples (feature phones)"
+  },
+  {
+    "id": 434,
+    "code": "20.009.00",
+    "description": "Telefones fixos com fio e sem fio"
+  },
+  {
+    "id": 435,
+    "code": "20.010.00",
+    "description": "Impressoras jato de tinta e laser"
+  },
+  { "id": 436, "code": "20.011.00", "description": "Scanners" },
+  {
+    "id": 437,
+    "code": "20.012.00",
+    "description": "Multifuncionais (impressora + scanner + copiadora)"
+  },
+  {
+    "id": 438,
+    "code": "20.013.00",
+    "description": "Cartuchos e toners para impressoras"
+  },
+  {
+    "id": 439,
+    "code": "20.014.00",
+    "description": "Câmeras fotográficas digitais"
+  },
+  {
+    "id": 440,
+    "code": "20.015.00",
+    "description": "Câmeras de vídeo (filmadoras)"
+  },
+  {
+    "id": 441,
+    "code": "20.016.00",
+    "description": "Câmeras de segurança e DVRs/NVRs"
+  },
+  { "id": 442, "code": "20.017.00", "description": "Aparelhos de som e rádio" },
+  {
+    "id": 443,
+    "code": "20.018.00",
+    "description": "Caixas de som e soundbars"
+  },
+  {
+    "id": 444,
+    "code": "20.019.00",
+    "description": "Fones de ouvido e headsets"
+  },
+  { "id": 445, "code": "20.020.00", "description": "Consoles de videogame" },
+  {
+    "id": 446,
+    "code": "20.021.00",
+    "description": "Pendrives e cartões de memória"
+  },
+  {
+    "id": 447,
+    "code": "20.022.00",
+    "description": "HDs externos e SSDs portáteis"
+  },
+  {
+    "id": 448,
+    "code": "20.023.00",
+    "description": "Roteadores Wi-Fi e switches de rede"
+  },
+  {
+    "id": 449,
+    "code": "20.024.00",
+    "description": "Smart watches e pulseiras fitness"
+  },
+  {
+    "id": 450,
+    "code": "20.025.00",
+    "description": "Aspiradores de pó e robôs aspiradores"
+  },
+  { "id": 451, "code": "20.026.00", "description": "Ferro de passar a vapor" },
+  {
+    "id": 452,
+    "code": "20.027.00",
+    "description": "Máquinas de lavar e lava-secar roupas"
+  },
+  { "id": 453, "code": "20.028.00", "description": "Secadoras de roupas" },
+  {
+    "id": 454,
+    "code": "20.029.00",
+    "description": "Máquinas de lavar louça (lava-louças)"
+  },
+  {
+    "id": 455,
+    "code": "20.030.00",
+    "description": "Refrigeradores e geladeiras"
+  },
+  {
+    "id": 456,
+    "code": "20.031.00",
+    "description": "Freezers verticais e horizontais"
+  },
+  { "id": 457, "code": "20.032.00", "description": "Micro-ondas" },
+  { "id": 458, "code": "20.033.00", "description": "Fogões a gás e elétricos" },
+  {
+    "id": 459,
+    "code": "20.034.00",
+    "description": "Fornos de embutir elétricos e a gás"
+  },
+  { "id": 460, "code": "20.035.00", "description": "Cooktops e indução" },
+  {
+    "id": 461,
+    "code": "20.036.00",
+    "description": "Coifas e exaustores de cozinha"
+  },
+  {
+    "id": 462,
+    "code": "20.037.00",
+    "description": "Air fryers e fritadeiras sem óleo"
+  },
+  { "id": 463, "code": "20.038.00", "description": "Liquidificadores" },
+  { "id": 464, "code": "20.039.00", "description": "Batedeiras" },
+  {
+    "id": 465,
+    "code": "20.040.00",
+    "description": "Processadores de alimentos"
+  },
+  {
+    "id": 466,
+    "code": "20.041.00",
+    "description": "Cafeteiras e máquinas de café (expresso, cápsulas, coador)"
+  },
+  { "id": 467, "code": "20.042.00", "description": "Torradeiras elétricas" },
+  { "id": 468, "code": "20.043.00", "description": "Chaleiras elétricas" },
+  {
+    "id": 469,
+    "code": "20.044.00",
+    "description": "Sanduicheiras, grelhadores e wafleiras"
+  },
+  {
+    "id": 470,
+    "code": "20.045.00",
+    "description": "Ar-condicionado split, janela e portátil"
+  },
+  {
+    "id": 471,
+    "code": "20.046.00",
+    "description": "Ventiladores de mesa, de teto e coluna"
+  },
+  {
+    "id": 472,
+    "code": "20.047.00",
+    "description": "Purificadores e filtros de água"
+  },
+  {
+    "id": 473,
+    "code": "20.048.00",
+    "description": "Secadores e pranchas de cabelo"
+  },
+  {
+    "id": 474,
+    "code": "20.049.00",
+    "description": "Barbeadores e depiladores elétricos"
+  },
+  { "id": 475, "code": "20.050.00", "description": "Escova dental elétrica" },
+
+  { "id": 476, "code": "21.001.00", "description": "Rações secas para cães" },
+  {
+    "id": 477,
+    "code": "21.002.00",
+    "description": "Rações úmidas (sachê, lata) para cães"
+  },
+  {
+    "id": 478,
+    "code": "21.003.00",
+    "description": "Petiscos e snacks para cães"
+  },
+  { "id": 479, "code": "21.004.00", "description": "Rações secas para gatos" },
+  {
+    "id": 480,
+    "code": "21.005.00",
+    "description": "Rações úmidas (sachê, lata) para gatos"
+  },
+  { "id": 481, "code": "21.006.00", "description": "Petiscos para gatos" },
+  {
+    "id": 482,
+    "code": "21.007.00",
+    "description": "Rações para pássaros e aves ornamentais"
+  },
+  {
+    "id": 483,
+    "code": "21.008.00",
+    "description": "Rações para peixes ornamentais"
+  },
+  {
+    "id": 484,
+    "code": "21.009.00",
+    "description": "Rações para roedores (hamster, coelho, porquinho-da-índia)"
+  },
+  { "id": 485, "code": "21.010.00", "description": "Rações para répteis" },
+  {
+    "id": 486,
+    "code": "21.011.00",
+    "description": "Suplementos vitamínicos e minerais para animais domésticos"
+  },
+
+  {
+    "id": 487,
+    "code": "22.001.00",
+    "description": "Sorvetes de massa (creme, chocolate, frutas)"
+  },
+  {
+    "id": 488,
+    "code": "22.002.00",
+    "description": "Picolés e gelados comestíveis"
+  },
+  {
+    "id": 489,
+    "code": "22.003.00",
+    "description": "Preparados para fabricação de sorvetes em máquinas (soft)"
+  },
+  {
+    "id": 490,
+    "code": "22.004.00",
+    "description": "Caldas e coberturas para sorvetes"
+  },
+  {
+    "id": 491,
+    "code": "22.005.00",
+    "description": "Açaí industrializado e polpas para sorveteria"
+  },
+
+  {
+    "id": 492,
+    "code": "23.001.00",
+    "description": "Tintas imobiliárias (látex, PVA, acrílica)"
+  },
+  { "id": 493, "code": "23.002.00", "description": "Tintas esmalte sintético" },
+  {
+    "id": 494,
+    "code": "23.003.00",
+    "description": "Vernizes, lacas e stains para madeira"
+  },
+  {
+    "id": 495,
+    "code": "23.004.00",
+    "description": "Primers e fundos preparadores"
+  },
+  {
+    "id": 496,
+    "code": "23.005.00",
+    "description": "Massas e seladores acrílicos"
+  },
+  { "id": 497, "code": "23.006.00", "description": "Tintas automotivas" },
+  {
+    "id": 498,
+    "code": "23.007.00",
+    "description": "Solventes (thinner, aguarrás, diluidores)"
+  },
+  { "id": 499, "code": "23.008.00", "description": "Removedores de tinta" },
+  {
+    "id": 500,
+    "code": "23.009.00",
+    "description": "Colas e adesivos de uso geral e construção"
+  },
+  {
+    "id": 501,
+    "code": "23.010.00",
+    "description": "Silicone e vedantes de construção"
+  },
+  {
+    "id": 502,
+    "code": "23.011.00",
+    "description": "Tintas para pintura artística"
+  },
+  {
+    "id": 503,
+    "code": "23.012.00",
+    "description": "Tintas industriais e de uso especial"
+  },
+
+  {
+    "id": 504,
+    "code": "24.001.00",
+    "description": "Automóveis de passageiros com motor até 1.0 litros"
+  },
+  {
+    "id": 505,
+    "code": "24.002.00",
+    "description": "Automóveis de passageiros com motor de 1.0 a 2.0 litros"
+  },
+  {
+    "id": 506,
+    "code": "24.003.00",
+    "description": "Automóveis de passageiros com motor acima de 2.0 litros"
+  },
+  {
+    "id": 507,
+    "code": "24.004.00",
+    "description": "Veículos utilitários esportivos (SUV)"
+  },
+  { "id": 508, "code": "24.005.00", "description": "Caminhonetes pickup" },
+  { "id": 509, "code": "24.006.00", "description": "Vans e minivans" },
+  { "id": 510, "code": "24.007.00", "description": "Ônibus e micro-ônibus" },
+  { "id": 511, "code": "24.008.00", "description": "Caminhões" },
+  {
+    "id": 512,
+    "code": "24.009.00",
+    "description": "Tratores e máquinas agrícolas automotrizes"
+  },
+  {
+    "id": 513,
+    "code": "24.010.00",
+    "description": "Veículos elétricos e híbridos"
+  },
+
+  {
+    "id": 514,
+    "code": "25.001.00",
+    "description": "Motocicletas com cilindrada até 125 cc"
+  },
+  {
+    "id": 515,
+    "code": "25.002.00",
+    "description": "Motocicletas com cilindrada de 125 a 300 cc"
+  },
+  {
+    "id": 516,
+    "code": "25.003.00",
+    "description": "Motocicletas com cilindrada acima de 300 cc"
+  },
+  { "id": 517, "code": "25.004.00", "description": "Scooters e motonetas" },
+  { "id": 518, "code": "25.005.00", "description": "Triciclos motorizados" },
+  { "id": 519, "code": "25.006.00", "description": "Quadriciclos" },
+
+  {
+    "id": 520,
+    "code": "26.001.00",
+    "description": "DVDs, Blu-rays e HDs de vídeo (mídias físicas)"
+  },
+  {
+    "id": 521,
+    "code": "26.002.00",
+    "description": "Jogos eletrônicos em mídia física (cartucho, disco)"
+  },
+  {
+    "id": 522,
+    "code": "26.003.00",
+    "description": "Controles de videogame e acessórios"
+  },
+  {
+    "id": 523,
+    "code": "26.004.00",
+    "description": "Aparelhos de DVD e Blu-ray"
+  },
+
+  {
+    "id": 524,
+    "code": "27.001.00",
+    "description": "Panelas e utensílios de cozinha (inox, alumínio, cerâmica)"
+  },
+  { "id": 525, "code": "27.002.00", "description": "Talheres" },
+  { "id": 526, "code": "27.003.00", "description": "Facas domésticas" },
+  {
+    "id": 527,
+    "code": "27.004.00",
+    "description": "Pratos, tigelas e travessas"
+  },
+  { "id": 528, "code": "27.005.00", "description": "Copos, canecas e xícaras" },
+  {
+    "id": 529,
+    "code": "27.006.00",
+    "description": "Garrafas térmicas e squeeze"
+  },
+  {
+    "id": 530,
+    "code": "27.007.00",
+    "description": "Potes e recipientes plásticos para alimentos"
+  },
+  {
+    "id": 531,
+    "code": "27.008.00",
+    "description": "Escorredores, peneiras e coadores de cozinha"
+  },
+  {
+    "id": 532,
+    "code": "27.009.00",
+    "description": "Bacias, baldes e vasilhames plásticos domésticos"
+  },
+  {
+    "id": 533,
+    "code": "27.010.00",
+    "description": "Vassouras, rodos e esfregões"
+  },
+  {
+    "id": 534,
+    "code": "27.011.00",
+    "description": "Esponjas e panos de limpeza doméstica"
+  },
+  { "id": 535, "code": "27.012.00", "description": "Sacos de lixo" },
+  { "id": 536, "code": "27.013.00", "description": "Lixeiras domésticas" },
+  { "id": 537, "code": "27.014.00", "description": "Cabides e porta-roupas" },
+  { "id": 538, "code": "27.015.00", "description": "Toalhas de banho e rosto" },
+  {
+    "id": 539,
+    "code": "27.016.00",
+    "description": "Roupas de cama (lençóis, fronhas, edredons)"
+  },
+  {
+    "id": 540,
+    "code": "27.017.00",
+    "description": "Toalhas de mesa e guardanapos têxteis"
+  },
+  { "id": 541, "code": "27.018.00", "description": "Tapetes e capachos" },
+  {
+    "id": 542,
+    "code": "27.019.00",
+    "description": "Cortinas e persianas têxteis"
+  },
+  { "id": 543, "code": "27.020.00", "description": "Travesseiros e almofadas" },
+  { "id": 544, "code": "27.021.00", "description": "Cobertores e mantas" },
+  { "id": 545, "code": "27.022.00", "description": "Colchões e box" },
+
+  {
+    "id": 546,
+    "code": "28.001.00",
+    "description": "Vestuário masculino (camisas, calças, bermudas)"
+  },
+  {
+    "id": 547,
+    "code": "28.002.00",
+    "description": "Vestuário feminino (blusas, vestidos, saias)"
+  },
+  {
+    "id": 548,
+    "code": "28.003.00",
+    "description": "Roupa íntima masculina e feminina"
+  },
+  { "id": 549, "code": "28.004.00", "description": "Meias e collants" },
+  {
+    "id": 550,
+    "code": "28.005.00",
+    "description": "Roupas de banho (biquínis, sungas, maiôs)"
+  },
+  {
+    "id": 551,
+    "code": "28.006.00",
+    "description": "Casacos, jaquetas e agasalhos"
+  },
+  {
+    "id": 552,
+    "code": "28.007.00",
+    "description": "Roupas esportivas e de academia"
+  },
+  {
+    "id": 553,
+    "code": "28.008.00",
+    "description": "Uniformes profissionais e escolares"
+  },
+  { "id": 554, "code": "28.009.00", "description": "Calçados masculinos" },
+  { "id": 555, "code": "28.010.00", "description": "Calçados femininos" },
+  { "id": 556, "code": "28.011.00", "description": "Calçados infantis" },
+  {
+    "id": 557,
+    "code": "28.012.00",
+    "description": "Tênis e calçados esportivos"
+  },
+  { "id": 558, "code": "28.013.00", "description": "Sandálias e chinelos" },
+  {
+    "id": 559,
+    "code": "28.014.00",
+    "description": "Bolsas femininas e masculinas"
+  },
+  { "id": 560, "code": "28.015.00", "description": "Cintos e suspensórios" },
+  { "id": 561, "code": "28.016.00", "description": "Chapéus, bonés e gorros" },
+  { "id": 562, "code": "28.017.00", "description": "Luvas e cachecóis" },
+  { "id": 563, "code": "28.018.00", "description": "Óculos de sol" },
+  {
+    "id": 564,
+    "code": "28.019.00",
+    "description": "Bijuterias e acessórios de moda"
+  },
+  {
+    "id": 565,
+    "code": "28.020.00",
+    "description": "Roupas infantis (bebê até 10 anos)"
+  },
+  {
+    "id": 566,
+    "code": "28.021.00",
+    "description": "Pijamas e roupa de dormir"
+  },
+  {
+    "id": 567,
+    "code": "28.022.00",
+    "description": "Roupas de proteção e EPIs (capacetes, botas, luvas industriais)"
+  }
+]

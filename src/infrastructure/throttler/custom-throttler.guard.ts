@@ -19,7 +19,7 @@ const SKIP_ROUTES = [
   '/ready',
   '/overview',
   '/commissions/my-metrics',
-  '/me',
+  '/users/me',
 ];
 
 /**

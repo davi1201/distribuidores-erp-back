@@ -1,0 +1,75 @@
+// Schema para NF-e emitidas via PlugNotas
+
+model NfeEmitida {
+  id                       String      @id @default(uuid())
+  tenantId                 String
+  idIntegracao             String      @unique // ID para rastreamento na API PlugNotas
+  plugnotasId              String?     // ID interno do PlugNotas (usado para download PDF/XML)
+  orderId                  String?     // Vínculo opcional com pedido
+  status                   String      // PROCESSANDO, AUTORIZADO, REJEITADO, CANCELADO, DENEGADO, ERRO
+  chaveAcesso              String?     @db.VarChar(44)
+  numero                   Int?
+  serie                    Int?
+  protocolo                String?
+  dataAutorizacao          DateTime?
+  mensagem                 String?     @db.Text
+  destinatarioDocumento    String?
+  destinatarioNome         String?
+  valorTotal               Decimal     @db.Decimal(10, 2)
+  naturezaOperacao         String
+  // Cancelamento
+  protocoloCancelamento    String?
+  dataCancelamento         DateTime?
+  justificativaCancelamento String?    @db.Text
+  // Auditoria
+  userId                   String
+  createdAt                DateTime    @default(now())
+  updatedAt                DateTime    @updatedAt
+  
+  tenant                   Tenant      @relation(fields: [tenantId], references: [id])
+  order                    Order?      @relation(fields: [orderId], references: [id])
+  user                     User        @relation(fields: [userId], references: [id])
+  eventos                  NfeEvento[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, orderId])
+  @@index([tenantId, chaveAcesso])
+  @@index([tenantId, createdAt])
+  @@map("nfe_emitidas")
+}
+
+model NfeEvento {
+  id          String   @id @default(uuid())
+  nfeId       String
+  tipo        String   // CARTA_CORRECAO, CANCELAMENTO, etc.
+  sequencia   Int?
+  protocolo   String?
+  dataEvento  DateTime
+  descricao   String?  @db.Text
+  status      String
+  createdAt   DateTime @default(now())
+  
+  nfe         NfeEmitida @relation(fields: [nfeId], references: [id], onDelete: Cascade)
+
+  @@index([nfeId, tipo])
+  @@map("nfe_eventos")
+}
+
+model NfeInutilizacao {
+  id              String   @id @default(uuid())
+  tenantId        String
+  serie           Int
+  numeroInicial   Int
+  numeroFinal     Int
+  justificativa   String   @db.Text
+  protocolo       String?
+  status          String
+  userId          String
+  createdAt       DateTime @default(now())
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@map("nfe_inutilizacoes")
+}

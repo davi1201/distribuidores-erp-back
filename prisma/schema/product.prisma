@@ -1,55 +1,42 @@
 model Product {
-  id       String @id @default(uuid())
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  // Identificação
-  name        String
-  description String? @db.Text
-
-  // CORREÇÃO AQUI: Removemos o @unique desta linha
-  sku String
-
-  ean   String?
-  brand String?
-  unit  String  @default("UN")
-
-  // Variações
-  parentId    String?
-  parent      Product?  @relation("ProductVariants", fields: [parentId], references: [id])
-  variants    Product[] @relation("ProductVariants")
-  variantName String?
-
-  // Dados Fiscais
-  ncm          String
-  cest         String?
-  cfop         String?
-  origin       Int         @default(0)
-  taxProfileId String?
-  taxProfile   TaxProfile? @relation(fields: [taxProfileId], references: [id])
-
-  // Custos e Preços
-  costPrice Decimal @default(0) @db.Decimal(10, 4)
-  expenses  Decimal @default(0) @db.Decimal(10, 4)
-  markup    Decimal @default(0) @db.Decimal(10, 4)
-
-  // Relacionamentos
-  prices       ProductPrice[]
-  priceHistory ProductPriceHistory[]
-  stock        StockItem[]
-  images       ProductImage[]
-  movements    StockMovement[]
-
-  supplier ProductSupplier?
-
-  isActive          Boolean             @default(true)
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  id                String                @id @default(uuid())
+  tenantId          String
+  name              String
+  description       String?
+  sku               String
+  ean               String?
+  brand             String?
+  unit              String                @default("UN")
+  parentId          String?
+  variantName       String?
+  ncmCode           String
+  cestCode          String?
+  cfopCode          String?
+  ncm               Ncm                   @relation(fields: [ncmCode], references: [code])
+  cest              Cest?                 @relation(fields: [cestCode], references: [code])
+  cfop              Cfop?                 @relation(fields: [cfopCode], references: [code])
+  origin            Int                   @default(0)
+  taxProfileId      String?
+  costPrice         Decimal               @default(0) @db.Decimal(10, 4)
+  expenses          Decimal               @default(0) @db.Decimal(10, 4)
+  markup            Decimal               @default(0) @db.Decimal(10, 4)
+  isActive          Boolean               @default(true)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
   OrderItem         OrderItem[]
+  images            ProductImage[]
+  priceHistory      ProductPriceHistory[]
+  prices            ProductPrice[]
+  supplier          ProductSupplier?
+  parent            Product?              @relation("ProductVariants", fields: [parentId], references: [id])
+  variants          Product[]             @relation("ProductVariants")
+  taxProfile        TaxProfile?           @relation(fields: [taxProfileId], references: [id])
+  tenant            Tenant                @relation(fields: [tenantId], references: [id])
+  stock             StockItem[]
+  movements         StockMovement[]
   StockTransferItem StockTransferItem[]
 
   @@unique([tenantId, sku])
-  // Índices para performance
   @@index([tenantId, name])
   @@index([tenantId, isActive])
   @@index([tenantId, parentId])
@@ -61,24 +48,22 @@ model ProductImage {
   url       String
   order     Int      @default(0)
   productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("product_images")
 }
 
 model ProductPrice {
-  id        String  @id @default(uuid())
-  price     Decimal @db.Decimal(10, 4)
-  productId String
-
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id          String    @id @default(uuid())
+  price       Decimal   @db.Decimal(10, 4)
+  productId   String
+  tenantId    String
   priceListId String
-  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
   updatedAt   DateTime  @updatedAt
+  priceList   PriceList @relation(fields: [priceListId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
 
   @@unique([productId, priceListId])
   @@map("product_prices")
@@ -90,12 +75,12 @@ model ProductPriceHistory {
   newPrice    Decimal   @db.Decimal(10, 4)
   reason      String?
   productId   String
-  product     Product   @relation(fields: [productId], references: [id])
   priceListId String
-  priceList   PriceList @relation(fields: [priceListId], references: [id])
   changedBy   String?
-  user        User?     @relation(fields: [changedBy], references: [id])
   createdAt   DateTime  @default(now())
+  user        User?     @relation(fields: [changedBy], references: [id])
+  priceList   PriceList @relation(fields: [priceListId], references: [id])
+  product     Product   @relation(fields: [productId], references: [id])
 
   @@map("product_price_history")
 }
@@ -103,10 +88,10 @@ model ProductPriceHistory {
 model TaxProfile {
   id          String    @id @default(uuid())
   tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   name        String
   description String?
   products    Product[]
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
   rules       TaxRule[]
 
   @@map("tax_profiles")
@@ -115,7 +100,6 @@ model TaxProfile {
 model TaxRule {
   id               String     @id @default(uuid())
   taxProfileId     String
-  taxProfile       TaxProfile @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
   originState      String
   destinationState String
   icmsRate         Decimal    @default(0) @db.Decimal(5, 2)
@@ -123,21 +107,21 @@ model TaxRule {
   pisRate          Decimal    @default(0) @db.Decimal(5, 2)
   cofinsRate       Decimal    @default(0) @db.Decimal(5, 2)
   updatedAt        DateTime   @updatedAt
+  taxProfile       TaxProfile @relation(fields: [taxProfileId], references: [id], onDelete: Cascade)
 
   @@unique([taxProfileId, originState, destinationState])
   @@map("tax_rules")
 }
 
 model StockItem {
-  id        String   @id @default(uuid())
-  productId String
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  quantity  Decimal  @default(0) @db.Decimal(10, 4)
-  minStock  Decimal  @default(0) @db.Decimal(10, 4)
-  maxStock  Decimal? @db.Decimal(10, 4)
-  updatedAt DateTime @updatedAt
-
+  id          String    @id @default(uuid())
+  productId   String
+  quantity    Decimal   @default(0) @db.Decimal(10, 4)
+  minStock    Decimal   @default(0) @db.Decimal(10, 4)
+  maxStock    Decimal?  @db.Decimal(10, 4)
+  updatedAt   DateTime  @updatedAt
   warehouseId String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
   warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
 
   @@unique([productId, warehouseId])

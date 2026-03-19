@@ -53,7 +53,10 @@ export class AsaasOnboardingService {
     }
 
     // Configura o Webhook na subconta
-    await this.configureWebhook(asaasApiKey!, tenant.billingProfile?.email!);
+    await this.configureWebhook(
+      asaasApiKey!,
+      tenant.billingProfile?.billingEmail!,
+    );
 
     // Busca a URL de envio de documentos
     const onboardingUrl = await this.fetchOnboardingUrl(asaasApiKey!);
@@ -210,7 +213,11 @@ export class AsaasOnboardingService {
       );
 
     const profile = tenant.billingProfile;
-    if (!profile?.document || !profile?.phone || !profile?.email) {
+    if (
+      !profile?.document ||
+      !profile?.commercialPhone ||
+      !profile?.billingEmail
+    ) {
       throw new HttpException(
         'Perfil financeiro incompleto.',
         HttpStatus.BAD_REQUEST,

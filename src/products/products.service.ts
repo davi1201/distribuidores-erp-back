@@ -48,8 +48,9 @@ export class ProductsService {
       const warehouse = await this.getOrCreateDefaultWarehouse(tenantId, tx);
       let parentId: string | null = null;
 
-      // 1. Cria o PAI (se houver dados)
+      // 1. Cria o PAI (se houver dados)das
       if (parentData) {
+        await this.resolveTaxCodes(parentData, tx);
         const parentSku = parentData.sku || `GRP-${generateSku()}`;
         const parent = await tx.product.create({
           data: {
@@ -58,9 +59,9 @@ export class ProductsService {
             description: parentData.description || '',
             brand: parentData.brand || '',
             sku: parentSku.toUpperCase(),
-            ncm: parentData.ncm,
-            cest: parentData.cest || '',
-            cfop: parentData.cfop || '',
+            ncmCode: parentData.ncm,
+            cestCode: parentData.cest || null,
+            cfopCode: parentData.cfop || null,
             origin: toNumber(parentData.origin),
             taxProfileId: parentData.taxProfileId || null,
             unit: 'UN',
@@ -151,15 +152,16 @@ export class ProductsService {
 
       // Atualiza PAI (Dados gerais)
       if (parentData && existingParent.variants.length > 0) {
+        await this.resolveTaxCodes(parentData, tx);
         await tx.product.update({
           where: { id: parentId },
           data: {
             name: parentData.name,
             description: parentData.description || '',
             brand: parentData.brand || '',
-            ncm: parentData.ncm,
-            cest: parentData.cest || '',
-            cfop: parentData.cfop || '',
+            ncmCode: parentData.ncm,
+            cestCode: parentData.cest || null,
+            cfopCode: parentData.cfop || null,
             origin: toNumber(parentData.origin),
             taxProfileId: parentData.taxProfileId || null,
           },
@@ -298,6 +300,7 @@ export class ProductsService {
     user: any,
     defaultWarehouseId: string,
   ) {
+    await this.resolveTaxCodes(data, tx);
     const sku = await this.ensureUniqueSku(tx, data.sku, tenantId);
 
     const product = await tx.product.create({
@@ -310,9 +313,9 @@ export class ProductsService {
         description: data.description || '',
         sku: sku,
         unit: data.unit || 'UN',
-        ncm: data.ncm || '',
-        cest: data.cest || '',
-        cfop: data.cfop || '',
+        ncmCode: data.ncm || '',
+        cestCode: data.cest || null,
+        cfopCode: data.cfop || null,
         origin: toNumber(data.origin),
         taxProfileId: data.taxProfileId || null,
         costPrice: toNumber(data.costPrice),
@@ -363,15 +366,16 @@ export class ProductsService {
     user: any,
     defaultWarehouseId: string,
   ) {
+    await this.resolveTaxCodes(data, tx);
     const updateData: any = {
       name: data.name,
       variantName: data.variantName,
       brand: data.brand || '',
       description: data.description || '',
       unit: data.unit,
-      ncm: data.ncm || '',
-      cest: data.cest || '',
-      cfop: data.cfop || '',
+      ncmCode: data.ncm || '',
+      cestCode: data.cest || null,
+      cfopCode: data.cfop || null,
       origin: toNumber(data.origin),
       taxProfileId: data.taxProfileId || null,
       costPrice: data.costPrice ? toNumber(data.costPrice) : undefined,
@@ -595,6 +599,32 @@ export class ProductsService {
     }
   }
 
+  private async resolveTaxCodes(data: any, tx: any) {
+    if (!data) return;
+
+    // Resolve NCM
+    if (data.ncm && data.ncm.length > 15) {
+      const record = await tx.ncm.findUnique({ where: { id: data.ncm } });
+      if (record) data.ncm = record.code;
+    }
+
+    // Resolve CEST
+    if (data.cest && data.cest.length > 15) {
+      const record = await tx.cest.findUnique({ where: { id: data.cest } });
+      if (record) data.cest = record.code;
+    } else if (data.cest === '') {
+      data.cest = null;
+    }
+
+    // Resolve CFOP
+    if (data.cfop && data.cfop.length > 15) {
+      const record = await tx.cfop.findUnique({ where: { id: data.cfop } });
+      if (record) data.cfop = record.code;
+    } else if (data.cfop === '') {
+      data.cfop = null;
+    }
+  }
+
   private async ensureUniqueSku(
     tx: any,
     providedSku: string | undefined,
@@ -675,6 +705,9 @@ export class ProductsService {
     };
     return {
       ...product,
+      ncm: product.ncmCode,
+      cest: product.cestCode,
+      cfop: product.cfopCode,
       supplier: product.supplier ?? product.variants[0]?.supplier,
       stock: stockItem,
       stockItems: product.stock,
@@ -748,6 +781,9 @@ export class ProductsService {
         brand: p.brand,
         ean: p.ean,
         unit: p.unit,
+        ncm: p.ncmCode,
+        cest: p.cestCode,
+        cfop: p.cfopCode,
         isActive: p.isActive,
         imageUrl: p.images[0]?.url || null,
         inventory: {
@@ -769,6 +805,9 @@ export class ProductsService {
           name: v.name,
           variantName: v.variantName,
           sku: v.sku,
+          ncm: v.ncmCode,
+          cest: v.cestCode,
+          cfop: v.cfopCode,
           supplier: supplierInfo,
           priceSales: v.prices.map((pr) => ({
             listId: pr.priceListId,
@@ -855,6 +894,9 @@ export class ProductsService {
 
       return {
         ...product,
+        ncm: (product as any).ncmCode,
+        cest: (product as any).cestCode,
+        cfop: (product as any).cfopCode,
         name: displayName,
         totalStock,
         matrixStock: stockInMatrix,

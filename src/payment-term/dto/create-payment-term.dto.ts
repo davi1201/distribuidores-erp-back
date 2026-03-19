@@ -44,11 +44,44 @@ export class CreatePaymentTermDto {
 
   @IsNumber()
   @Min(0)
-  @Type(() => Number) // Converte a string "0" do front para number
+  @Type(() => Number)
   minAmount: number;
 
   @IsBoolean()
   isFlexible: boolean;
+
+  // --- Desconto por Pontualidade ---
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  @Type(() => Number)
+  discountPercentage?: number; // Ex: 5% de desconto
+
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  @Type(() => Number)
+  discountDays?: number; // Dias para o desconto ser válido (ex: 10 dias antes do vencimento)
+
+  // --- Juros e Multa por Atraso ---
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  @Type(() => Number)
+  interestPercentage?: number; // Juros ao mês (ex: 1%)
+
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  @IsOptional()
+  @Type(() => Number)
+  finePercentage?: number; // Multa fixa por atraso (ex: 2%)
+
+  @IsString()
+  @IsOptional()
+  instructions?: string; // Observações para boleto/fatura
 
   @IsArray()
   @IsUUID('all', { each: true })

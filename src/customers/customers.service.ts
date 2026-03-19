@@ -297,68 +297,79 @@ export class CustomersService {
     // Separa os relacionamentos do resto dos dados
     const { contacts, addresses, attachments, ...customerData } = updateDto;
 
-    // Sanitização de dados (Vazio vira Null)
-    const dataToUpdate: any = {
-      ...customerData,
-      sellerId: customerData.sellerId || null,
-      priceListId: customerData.priceListId || null,
-      categoryId: customerData.categoryId || null,
-      paymentConditionId: customerData.paymentConditionId || null,
-    };
+    // Sanitização de dados (Vazio vira Null) - Somente se o campo foi enviado
+    const dataToUpdate: any = { ...customerData };
+
+    if (customerData.sellerId === '') dataToUpdate.sellerId = null;
+    if (customerData.priceListId === '') dataToUpdate.priceListId = null;
+    if (customerData.categoryId === '') dataToUpdate.categoryId = null;
+    if (customerData.paymentConditionId === '') dataToUpdate.paymentConditionId = null;
+
+    // Sanitização de CPF/CNPJ e Telefone (Remove pontuação se fornecido)
+    if (customerData.document) {
+      dataToUpdate.document = customerData.document.replace(/\D/g, '');
+    }
+    if (customerData.phone) {
+      dataToUpdate.phone = customerData.phone.replace(/\D/g, '');
+    }
 
     // Lógica de Segurança para Vendedor
     if (currentUser.role === 'SELLER') {
       delete dataToUpdate.sellerId;
     }
 
+    const updateData: any = {
+      ...dataToUpdate,
+    };
+
+    // ATUALIZAÇÃO DOS CONTATOS (Somente se enviado)
+    if (contacts) {
+      updateData.contacts = {
+        deleteMany: {},
+        create: contacts.map((c) => ({
+          name: c.name,
+          phone: c.phone,
+          role: c.role,
+        })),
+      };
+    }
+
+    // ATUALIZAÇÃO DOS ENDEREÇOS (Somente se enviado)
+    if (addresses) {
+      updateData.addresses = {
+        deleteMany: {},
+        create: addresses.map((a) => ({
+          zipCode: a.zipCode,
+          street: a.street,
+          number: a.number,
+          complement: a.complement,
+          neighborhood: a.neighborhood,
+          ibgeCode: String(a.ibgeCode || ''),
+
+          city: a.city ? { connect: { id: toNumber(a.city) } } : undefined,
+          state: a.state ? { connect: { id: toNumber(a.state) } } : undefined,
+          category: a.categoryId
+            ? { connect: { id: a.categoryId } }
+            : undefined,
+        })),
+      };
+    }
+
+    // ATUALIZAÇÃO DOS ANEXOS (Somente se enviado)
+    if (attachments) {
+      updateData.attachments = {
+        deleteMany: {},
+        create: attachments.map((att) => ({
+          name: att.name,
+          url: att.url,
+          tenantId,
+        })),
+      };
+    }
+
     return this.prisma.customer.update({
       where: { id },
-      data: {
-        ...dataToUpdate,
-
-        // ATUALIZAÇÃO DOS CONTATOS
-        contacts: {
-          deleteMany: {},
-          create: contacts?.map((c) => ({
-            name: c.name,
-            phone: c.phone,
-            role: c.role,
-          })),
-        },
-
-        // ATUALIZAÇÃO DOS ENDEREÇOS (FIX AQUI)
-        addresses: {
-          deleteMany: {},
-          create: addresses?.map((a) => ({
-            zipCode: a.zipCode,
-            street: a.street,
-            number: a.number,
-            complement: a.complement,
-            neighborhood: a.neighborhood,
-            ibgeCode: String(a.ibgeCode || ''),
-
-            // 👇 Correção: Usando 'connect' para relações
-            city: a.city ? { connect: { id: toNumber(a.city) } } : undefined,
-
-            state: a.state ? { connect: { id: toNumber(a.state) } } : undefined,
-
-            category: a.categoryId
-              ? { connect: { id: a.categoryId } }
-              : undefined,
-          })),
-        },
-
-        // ATUALIZAÇÃO DOS ANEXOS
-        attachments: {
-          deleteMany: {},
-          create:
-            attachments?.map((att) => ({
-              name: att.name,
-              url: att.url,
-              tenantId,
-            })) || [],
-        },
-      },
+      data: updateData,
       include: {
         contacts: true,
         addresses: { include: { category: true, city: true, state: true } },

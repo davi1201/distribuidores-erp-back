@@ -1,36 +1,86 @@
 model BillingProfile {
-  id String @id @default(uuid())
-
-  personType PersonType @default(PJ)
-  document   String     @unique
-  email      String
-  phone      String
-
-  zipCode      String
-  street       String
-  number       String
-  complement   String?
-  neighborhood String
-  cityName     String
-  stateUf      String
-
-  cityId Int?
-  city   City? @relation(fields: [cityId], references: [id])
-
-  stateId Int?
-  state   State? @relation(fields: [stateId], references: [id])
-
-  birthDate DateTime?
-
-  tenantId String @unique
-  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  asaasCustomerId      String? @unique
-  asaasCreditCardToken String? // O token alfanumérico seguro
-  asaasCardLast4       String? // Ex: "1234" (Para mostrar no Front-end)
-  asaasCardBrand       String? // Ex: "MASTERCARD", "VISA"
-
-  updatedAt DateTime @updatedAt
+  id                     String                  @id @default(uuid())
+  personType             PersonType              @default(PJ)
+  document               String                  @unique
+  zipCode                String                  @default("")
+  street                 String                  @default("")
+  number                 String                  @default("")
+  complement             String?
+  neighborhood           String                  @default("")
+  cityId                 Int?
+  stateId                Int?
+  birthDate              DateTime?
+  tenantId               String                  @unique
+  asaasCustomerId        String?                 @unique
+  asaasCreditCardToken   String?
+  asaasCardLast4         String?
+  asaasCardBrand         String?
+  updatedAt              DateTime                @updatedAt
+  billingEmail           String?
+  commercialEmail        String?
+  commercialPhone        String?
+  commercialPhoneContact String?
+  companyName            String                  @default("")
+  ownerDocument          String?
+  ownerName              String?
+  partners               BillingProfilePartner[]
+  city                   City?                   @relation(fields: [cityId], references: [id])
+  state                  State?                  @relation(fields: [stateId], references: [id])
+  tenant                 Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("billing_profiles")
+}
+
+model BillingProfilePartner {
+  id               String         @id @default(uuid())
+  name             String         @default("")
+  document         String         @default("")
+  qualification    String         @default("")
+  entryDate        DateTime?
+  ageGroup         String?
+  type             String?
+  billingProfileId String
+  billingProfile   BillingProfile @relation(fields: [billingProfileId], references: [id], onDelete: Cascade)
+
+  @@map("billing_profile_partners")
+}
+
+model Subscription {
+  id                 String    @id @default(uuid())
+  externalId         String    @unique
+  customerId         String
+  status             String
+  gateway            String    @default("STRIPE")
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  tenantId           String
+  planId             String
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  Invoice            Invoice[]
+  plan               Plan      @relation(fields: [planId], references: [id])
+  tenant             Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id             String       @id @default(uuid())
+  externalId     String       @unique
+  amount         Decimal      @db.Decimal(10, 2)
+  status         String
+  subscriptionId String
+  createdAt      DateTime     @default(now())
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("invoices")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  CANCELED
+  PAID
+  PENDING_PAYMENT
+  ENDED
+  PAST_DUE
 }

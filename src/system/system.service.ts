@@ -35,7 +35,7 @@ export class SystemService {
         tenantConfigId: config?.id || null,
         customName: config?.customName || sysMethod.name,
         isActive: config?.isActive || false,
-        discountPercentage: config ? toNumber(config.discountPercentage) : 0,
+
         maxInstallments: config?.maxInstallments || 1,
         minInstallmentValue: config ? toNumber(config.minInstallmentValue) : 0,
         passFeeToCustomer: config?.passFeeToCustomer || false,

@@ -155,7 +155,7 @@ export class SalesService {
     return {
       sellerWarehouse,
       matrixWarehouse,
-      originState: tenant?.billingProfile?.stateUf || 'PR',
+      originState: tenant?.billingProfile?.stateId || 'PR',
       destinationState: customer.addresses[0].stateCode,
     };
   }

@@ -50,6 +50,12 @@ export class PaymentTermsService {
         isFlexible: dto.isFlexible,
         minAmount: dto.minAmount || 0,
         installmentsCount: dto.rules.length,
+        // --- Desconto e Juros (Padrão ERP) ---
+        discountPercentage: dto.discountPercentage || 0,
+        discountDays: dto.discountDays || 0,
+        interestPercentage: dto.interestPercentage || 0,
+        finePercentage: dto.finePercentage || 0,
+        instructions: dto.instructions,
         rules: dto.rules as any,
         allowedMethods: {
           connect: tenantMethods.map((m) => ({ id: m.id })),
@@ -74,13 +80,12 @@ export class PaymentTermsService {
           select: {
             id: true,
             customName: true,
-            systemPaymentMethod: { select: { name: true } },
+            systemPaymentMethod: { select: { name: true, id: true } },
           },
         },
       },
       orderBy: { name: 'asc' },
     });
-    // ✅ Removido o .map com JSON.parse, o Prisma já traz o objeto pronto!
   }
 
   async findOne(id: string, tenantId: string) {
@@ -99,20 +104,48 @@ export class PaymentTermsService {
   }
 
   async update(id: string, dto: any, tenantId: string) {
-    // Mantendo a função de update que grandes sistemas precisam
+    // 1. Verificar e converter os IDs do Sistema para os IDs do Tenant
+    let tenantMethodIds: string[] = [];
+
+    if (dto.methodIds && dto.methodIds.length > 0) {
+      // Busca os métodos do Tenant que correspondem aos IDs do sistema enviados
+      const tenantMethods = await this.prisma.tenantPaymentMethod.findMany({
+        where: {
+          tenantId: tenantId,
+          systemPaymentMethodId: {
+            in: dto.methodIds,
+          },
+        },
+        select: { id: true },
+      });
+
+      tenantMethodIds = tenantMethods.map((method) => method.id);
+    }
+
+    // 2. Realizar o update com os IDs corretos
     return this.prisma.paymentTerm.update({
       where: { id, tenantId },
       data: {
         name: dto.name,
         description: dto.description,
         type: dto.type,
+        isActive: dto.isActive,
         isFlexible: dto.isFlexible,
         minAmount: dto.minAmount,
+
+        // --- Desconto e Juros (Padrão ERP) ---
+        discountPercentage: dto.discountPercentage,
+        discountDays: dto.discountDays,
+        interestPercentage: dto.interestPercentage,
+        finePercentage: dto.finePercentage,
+
+        instructions: dto.instructions,
         rules: dto.rules,
-        installmentsCount: dto.rules?.length,
+        installmentsCount: dto.rules?.length || dto.installmentsCount || 1,
+
+        // Agora conectamos usando os IDs da tabela correta (TenantPaymentMethod)
         allowedMethods: {
-          // No update de N:N, usamos 'set' para substituir a lista antiga pela nova
-          set: dto.methodIds?.map((id) => ({ id })) || [],
+          set: tenantMethodIds.map((methodId) => ({ id: methodId })),
         },
       },
     });

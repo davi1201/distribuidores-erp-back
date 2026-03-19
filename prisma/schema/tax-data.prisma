@@ -1,0 +1,49 @@
+model Ncm {
+  id          String    @id @default(uuid())
+  code        String    @unique @db.VarChar(8)
+  description String    @db.Text
+  unit        String?   @db.VarChar(10) // Unidade tributável (Ex: UN, KG)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([code])
+  @@index([description])
+  @@map("tax_ncms")
+}
+
+model Cest {
+  id          String    @id @default(uuid())
+  code        String    @unique @db.VarChar(7)
+  ncmCode     String?   @db.VarChar(8) // Vinculo opcional com NCM
+  description String    @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([code])
+  @@index([ncmCode])
+  @@map("tax_cests")
+}
+
+model Cfop {
+  id          String    @id @default(uuid())
+  code        String    @unique @db.VarChar(4)
+  description String    @db.Text
+  type        CfopType
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@index([code])
+  @@index([type])
+  @@map("tax_cfops")
+}
+
+enum CfopType {
+  ENTRY // Entrada (Códigos começam com 1, 2, 3)
+  EXIT  // Saída (Códigos começam com 5, 6, 7)
+}

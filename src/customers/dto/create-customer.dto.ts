@@ -17,12 +17,15 @@ export enum PersonType {
 }
 
 class CreateContactDto {
+  @IsString() @IsOptional() id?: string;
+  @IsString() @IsOptional() customerId?: string;
   @IsString() @IsOptional() name?: string;
   @IsString() @IsOptional() phone?: string;
   @IsString() @IsOptional() role?: string;
 }
 
 class CreateAddressDto {
+  @IsString() @IsOptional() id?: string;
   @IsString() @IsOptional() zipCode?: string;
   @IsString() @IsOptional() street?: string;
   @IsString() @IsOptional() number?: string;
@@ -43,6 +46,12 @@ class CreateAddressDto {
 
   @IsString() @IsOptional() ibgeCode?: string;
   @IsString() @IsOptional() categoryId?: string;
+  @IsString() @IsOptional() customerId?: string;
+
+  // Novos campos vindos do payload que devem ser ignorados mas permitidos
+  @IsNumber() @IsOptional() cityCode?: number;
+  @IsNumber() @IsOptional() stateCode?: number;
+  @IsOptional() category?: any;
 }
 
 class CreateAttachmentDto {

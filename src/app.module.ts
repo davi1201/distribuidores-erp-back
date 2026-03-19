@@ -35,6 +35,7 @@ import { SystemModule } from './system/system.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CommonModule } from './common/common.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
+import { TaxModule } from './tax/tax.module';
 import configuration from './config/configuration';
 
 // Clean Architecture Modules
@@ -91,6 +92,7 @@ import { QueueModule } from './infrastructure/queue/queue.module';
     AsaasModule,
     MailModule,
     SystemModule,
+    TaxModule,
   ],
   controllers: [],
   providers: [

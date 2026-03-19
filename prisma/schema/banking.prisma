@@ -1,4 +1,51 @@
-// Enum para o status da transação bancária
+model BankAccount {
+  id                String              @id @default(uuid())
+  tenantId          String
+  name              String
+  agency            String?
+  account           String?
+  isDefault         Boolean             @default(false)
+  pixKey            String?
+  pixKeyType        PixKeyType?
+  isActive          Boolean             @default(true)
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  statements        BankStatement[]
+  transactions      BankTransaction[]
+  FinancialMovement FinancialMovement[]
+
+  @@map("bank_accounts")
+}
+
+model BankStatement {
+  id            String            @id @default(uuid())
+  bankAccountId String
+  fileName      String
+  importedAt    DateTime          @default(now())
+  bankAccount   BankAccount       @relation(fields: [bankAccountId], references: [id])
+  transactions  BankTransaction[]
+
+  @@map("bank_statements")
+}
+
+model BankTransaction {
+  id                  String                @id @default(uuid())
+  bankAccountId       String
+  bankStatementId     String
+  fitId               String                @unique
+  type                TransactionType
+  amount              Decimal               @db.Decimal(10, 2)
+  date                DateTime
+  description         String
+  status              BankTransactionStatus @default(PENDING)
+  financialMovementId String?               @unique
+  createdAt           DateTime              @default(now())
+  bankAccount         BankAccount           @relation(fields: [bankAccountId], references: [id])
+  bankStatement       BankStatement         @relation(fields: [bankStatementId], references: [id])
+  financialMovement   FinancialMovement?    @relation(fields: [financialMovementId], references: [id])
+
+  @@map("bank_transactions")
+}
+
 enum BankTransactionStatus {
   PENDING
   RECONCILED
@@ -16,63 +63,4 @@ enum PixKeyType {
   EMAIL
   PHONE
   EVP
-}
-
-model BankAccount {
-  id       String  @id @default(uuid())
-  tenantId String
-  name     String // Ex: Conta Itaú Principal
-  agency   String?
-  account  String?
-
-  isDefault  Boolean     @default(false)
-  pixKey     String?
-  pixKeyType PixKeyType? // Ex: CPF, CNPJ, EMAIL, PHONE
-  isActive   Boolean     @default(true)
-
-  statements        BankStatement[]
-  transactions      BankTransaction[]
-  tenant            Tenant              @relation(fields: [tenantId], references: [id])
-  FinancialMovement FinancialMovement[]
-
-  @@map("bank_accounts")
-}
-
-model BankStatement {
-  id            String   @id @default(uuid())
-  bankAccountId String
-  fileName      String // Ex: extrato-fev.ofx
-  importedAt    DateTime @default(now())
-
-  bankAccount  BankAccount       @relation(fields: [bankAccountId], references: [id])
-  transactions BankTransaction[]
-
-  @@map("bank_statements")
-}
-
-model BankTransaction {
-  id              String @id @default(uuid())
-  bankAccountId   String
-  bankStatementId String
-
-  fitId       String          @unique // ID único gerado pelo banco (vem no OFX)
-  type        TransactionType
-  amount      Decimal         @db.Decimal(10, 2)
-  date        DateTime
-  description String // Ex: "TARIFA PIX" ou "PAG BOLETO"
-
-  status BankTransactionStatus @default(PENDING)
-
-  // AQUI ESTÁ A MUDANÇA CHAVE: 
-  // Apontamos para o Movimento Financeiro (FinancialMovement), que é o registro real da baixa no seu sistema.
-  financialMovementId String? @unique
-
-  financialMovement FinancialMovement? @relation(fields: [financialMovementId], references: [id])
-
-  bankAccount   BankAccount   @relation(fields: [bankAccountId], references: [id])
-  bankStatement BankStatement @relation(fields: [bankStatementId], references: [id])
-
-  createdAt DateTime @default(now())
-
-  @@map("bank_transactions")
 }

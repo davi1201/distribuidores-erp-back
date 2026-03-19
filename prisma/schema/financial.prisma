@@ -1,4 +1,92 @@
-// --- ENUMS ---
+model FinancialCategory {
+  id          String           @id @default(uuid())
+  tenantId    String
+  name        String
+  type        CategoryType
+  description String?
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  titles      FinancialTitle[]
+
+  @@map("financial_categories")
+}
+
+model FinancialTitle {
+  id                    String               @id @default(uuid())
+  tenantId              String
+  importId              String?
+  origin                TitleOrigin          @default(MANUAL)
+  titleNumber           String
+  description           String?
+  installmentNumber     Int?                 @default(1)
+  totalInstallments     Int?                 @default(1)
+  type                  TitleType            @default(RECEIVABLE)
+  customerId            String?
+  supplierId            String?
+  categoryId            String?
+  orderId               String?
+  orderPaymentId        String?
+  tenantPaymentMethodId String?
+  paymentTermId         String?
+  asaasPaymentId        String?
+  boletoUrl             String?
+  pixCopyPaste          String?
+  invoiceUrl            String?
+  createdById           String?
+  originalAmount        Decimal              @db.Decimal(10, 2)
+  balance               Decimal              @db.Decimal(10, 2)
+  paidAmount            Decimal              @default(0) @db.Decimal(10, 2)
+  issueDate             DateTime             @default(now())
+  dueDate               DateTime
+  competenceDate        DateTime             @default(now())
+  paidAt                DateTime?
+  status                TitleStatus          @default(OPEN)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+  movements             FinancialMovement[]
+  category              FinancialCategory?   @relation(fields: [categoryId], references: [id])
+  createdBy             User?                @relation("UserCreatedTitles", fields: [createdById], references: [id])
+  customer              Customer?            @relation(fields: [customerId], references: [id])
+  order                 Order?               @relation(fields: [orderId], references: [id])
+  orderPayment          OrderPayment?        @relation(fields: [orderPaymentId], references: [id])
+  paymentTerm           PaymentTerm?         @relation(fields: [paymentTermId], references: [id])
+  supplier              Supplier?            @relation(fields: [supplierId], references: [id])
+  tenant                Tenant               @relation(fields: [tenantId], references: [id])
+  tenantPaymentMethod   TenantPaymentMethod? @relation(fields: [tenantPaymentMethodId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, dueDate])
+  @@index([orderId])
+  @@map("financial_titles")
+}
+
+model FinancialMovement {
+  id                    String               @id @default(uuid())
+  tenantId              String
+  titleId               String
+  type                  MovementType
+  amount                Decimal              @db.Decimal(10, 2)
+  paymentDate           DateTime             @default(now())
+  userId                String?
+  observation           String?
+  bankAccountId         String?
+  tenantPaymentMethodId String?
+  paymentTermId         String?
+  reconciled            Boolean              @default(false)
+  reconciledAt          DateTime?
+  createdAt             DateTime             @default(now())
+  BankTransaction       BankTransaction?
+  bankAccount           BankAccount?         @relation(fields: [bankAccountId], references: [id])
+  PaymentTerm           PaymentTerm?         @relation(fields: [paymentTermId], references: [id])
+  tenant                Tenant               @relation(fields: [tenantId], references: [id])
+  tenantPaymentMethod   TenantPaymentMethod? @relation(fields: [tenantPaymentMethodId], references: [id])
+  title                 FinancialTitle       @relation(fields: [titleId], references: [id], onDelete: Cascade)
+  user                  User?                @relation(fields: [userId], references: [id])
+
+  @@map("financial_movements")
+}
 
 enum TitleStatus {
   OPEN
@@ -32,147 +120,4 @@ enum MovementType {
 enum CategoryType {
   RECEIVABLE
   PAYABLE
-}
-
-model FinancialCategory {
-  id       String @id @default(uuid())
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  name        String
-  type        CategoryType
-  description String?
-  isActive    Boolean      @default(true)
-
-  titles FinancialTitle[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("financial_categories")
-}
-
-// --- TÍTULOS FINANCEIROS ---
-
-model FinancialTitle {
-  id       String  @id @default(uuid())
-  tenantId String
-  tenant   Tenant  @relation(fields: [tenantId], references: [id])
-  importId String?
-
-  origin      TitleOrigin @default(MANUAL)
-  titleNumber String
-  description String?
-
-  installmentNumber Int? @default(1)
-  totalInstallments Int? @default(1)
-
-  type TitleType @default(RECEIVABLE)
-
-  // --- Vínculos de Entidades ---
-  customerId String?
-  customer   Customer?          @relation(fields: [customerId], references: [id])
-  supplierId String?
-  supplier   Supplier?          @relation(fields: [supplierId], references: [id])
-  categoryId String?
-  category   FinancialCategory? @relation(fields: [categoryId], references: [id])
-
-  orderId String?
-  order   Order?  @relation(fields: [orderId], references: [id])
-
-  orderPaymentId String?
-  orderPayment   OrderPayment? @relation(fields: [orderPaymentId], references: [id])
-
-  tenantPaymentMethodId String?
-  tenantPaymentMethod   TenantPaymentMethod? @relation(fields: [tenantPaymentMethodId], references: [id])
-
-  paymentTermId String?
-  paymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
-
-  asaasPaymentId String?
-  boletoUrl      String?
-  pixCopyPaste   String?
-  invoiceUrl     String?
-
-  createdById String?
-  createdBy   User?   @relation("UserCreatedTitles", fields: [createdById], references: [id])
-
-  // --- Valores e Datas ---
-  originalAmount Decimal @db.Decimal(10, 2)
-  balance        Decimal @db.Decimal(10, 2)
-  paidAmount     Decimal @default(0) @db.Decimal(10, 2)
-
-  issueDate      DateTime  @default(now())
-  dueDate        DateTime
-  competenceDate DateTime  @default(now())
-  paidAt         DateTime?
-
-  status TitleStatus @default(OPEN) // CUIDADO: O seu enum é TitleStatus, ajuste para status TitleStatus @default(OPEN)
-
-  movements FinancialMovement[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([tenantId, status])
-  @@index([tenantId, dueDate])
-  @@index([orderId])
-  @@map("financial_titles")
-}
-
-// --- MOVIMENTAÇÕES (Baixa/Pagamento) ---
-
-model FinancialMovement {
-  id       String @id @default(uuid())
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
-
-  titleId String
-  title   FinancialTitle @relation(fields: [titleId], references: [id], onDelete: Cascade)
-
-  type        MovementType
-  amount      Decimal      @db.Decimal(10, 2)
-  paymentDate DateTime     @default(now())
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
-
-  observation String?
-
-  bankAccountId String?
-  bankAccount   BankAccount? @relation(fields: [bankAccountId], references: [id])
-
-  // =====================================================================
-  // 🔥 NOVO: FORMA DE PAGAMENTO DA BAIXA
-  // Como o cliente pagou esse título? (Ex: Era um boleto, mas ele pagou via PIX)
-  // =====================================================================
-  tenantPaymentMethodId String?
-  tenantPaymentMethod   TenantPaymentMethod? @relation(fields: [tenantPaymentMethodId], references: [id])
-
-  paymentTermId String?
-  PaymentTerm   PaymentTerm? @relation(fields: [paymentTermId], references: [id])
-
-  reconciled   Boolean   @default(false)
-  reconciledAt DateTime?
-
-  BankTransaction BankTransaction?
-
-  createdAt DateTime @default(now())
-
-  @@map("financial_movements")
-}
-
-model SystemPaymentMethod {
-  id   String @id @default(uuid())
-  name String // Ex: "Cartão de Crédito", "Pix", "Boleto"
-  code String @unique // Ex: "CREDIT_CARD", "PIX", "BOLETO"
-
-  isAcquirer Boolean @default(false)
-
-  tenantMethods TenantPaymentMethod[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("system_payment_methods")
 }

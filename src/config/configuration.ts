@@ -72,6 +72,13 @@ export default () => ({
     ttl: parseInt(process.env.RATE_LIMIT_TTL || '60', 10),
     limit: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   },
+
+  // PlugNotas Integration
+  plugnotas: {
+    apiKey: process.env.PLUGNOTAS_API_KEY,
+    ambiente: process.env.PLUGNOTAS_AMBIENTE || 'sandbox', // 'sandbox' ou 'producao'
+    webhookToken: process.env.PLUGNOTAS_WEBHOOK_TOKEN,
+  },
 });
 
 /**
@@ -125,5 +132,10 @@ export interface AppConfig {
   rateLimit: {
     ttl: number;
     limit: number;
+  };
+  plugnotas: {
+    apiKey?: string;
+    ambiente: string;
+    webhookToken?: string;
   };
 }

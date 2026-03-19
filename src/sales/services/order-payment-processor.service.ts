@@ -11,7 +11,6 @@ import { Prisma, TitleType, TitleStatus } from '@prisma/client';
 export interface PaymentMethodInfo {
   id: string;
   name: string;
-  discountPercentage: number;
   maxInstallments: number;
   minInstallmentValue: number;
   passFeeToCustomer: boolean;
@@ -72,7 +71,6 @@ export class OrderPaymentProcessorService {
     return {
       id: method.id,
       name: method.customName || method.systemPaymentMethod.name,
-      discountPercentage: toNumber(method.discountPercentage),
       maxInstallments: method.maxInstallments,
       minInstallmentValue: toNumber(method.minInstallmentValue),
       passFeeToCustomer: method.passFeeToCustomer,
