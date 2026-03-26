@@ -8,6 +8,7 @@ import {
 import { createLogger } from '../../core/logging';
 import { clerkClient } from '@clerk/clerk-sdk-node';
 import { PrismaService } from '../../prisma/prisma.service';
+import { addDays } from 'date-fns';
 
 @Injectable()
 export class ClerkAuthGuard implements CanActivate {
@@ -26,24 +27,29 @@ export class ClerkAuthGuard implements CanActivate {
       const decodedSession = await clerkClient.verifyToken(token);
       const clerkUserId = decodedSession.sub;
 
-      // 2. Validação de Existência no Banco Local (Autorização)
-      // Buscamos apenas para ler. Não criamos nada aqui.
-      const user = await this.prisma.user.findUnique({
+      // 2. Busca o usuário no banco local
+      let user = await this.prisma.user.findUnique({
         where: { clerkId: clerkUserId },
         include: { tenant: true },
       });
 
-      // 3. Regra de Bloqueio (Sync Lag)
-      // Se o token é válido, mas o usuário não está no banco, significa
-      // que o Webhook ainda não chegou ou falhou.
-      // O Guard DEVE bloquear para evitar inconsistência.
+      // 3. Auto-provisioning: se o user não existe localmente,
+      //    busca dados no Clerk e cria User + Tenant + Warehouse.
       if (!user) {
         this.logger.warn(
-          `Guard: Usuário ${clerkUserId} autenticado no Clerk mas não encontrado no banco. Aguardando Webhook.`,
+          `Guard: Usuário ${clerkUserId} autenticado no Clerk mas não encontrado no banco. Iniciando auto-provisioning...`,
         );
-        throw new UnauthorizedException(
-          'Sua conta está sendo sincronizada. Tente novamente em alguns segundos.',
-        );
+
+        user = await this.autoProvisionUser(clerkUserId);
+
+        if (!user) {
+          this.logger.error(
+            `Guard: Falha no auto-provisioning do usuário ${clerkUserId}.`,
+          );
+          throw new UnauthorizedException(
+            'Não foi possível configurar sua conta. Tente novamente.',
+          );
+        }
       }
 
       if (!user.tenantId) {
@@ -53,20 +59,18 @@ export class ClerkAuthGuard implements CanActivate {
       }
 
       // 4. Injeção de Contexto
-      // O usuário existe, então injetamos no request para os Controllers usarem.
       request.user = {
         userId: user.id,
         clerkId: user.clerkId,
         email: user.email,
         role: user.role,
-        tenantId: user.tenantId, // Pode ser null se ele ainda não tiver empresa
+        tenantId: user.tenantId,
         permissions: (user as any).permissions,
         name: user.name,
       };
 
       return true;
     } catch (error) {
-      // Diferencia erro de "não encontrado" de erros de token inválido
       if (error instanceof UnauthorizedException) {
         throw error;
       }
@@ -76,6 +80,111 @@ export class ClerkAuthGuard implements CanActivate {
         message: 'Sessão inválida ou expirada',
         details: error.message,
       });
+    }
+  }
+
+  /**
+   * Busca dados do usuário no Clerk e cria User + Tenant + Warehouse
+   * numa única transação. Fallback quando o webhook não chegou a tempo.
+   */
+  private async autoProvisionUser(clerkUserId: string) {
+    try {
+      // Busca dados completos do user no Clerk
+      const clerkUser = await clerkClient.users.getUser(clerkUserId);
+      const email = clerkUser.emailAddresses[0]?.emailAddress;
+      const name =
+        `${clerkUser.firstName || ''} ${clerkUser.lastName || ''}`.trim() ||
+        'Novo Usuário';
+      const image = clerkUser.imageUrl;
+
+      if (!email) {
+        this.logger.error(
+          `Guard: Usuário Clerk ${clerkUserId} não possui email. Impossível provisionar.`,
+        );
+        return null;
+      }
+
+      this.logger.log(
+        `Guard: Auto-provisionando ${email} (clerkId=${clerkUserId})...`,
+      );
+
+      // Verifica se já existe por email (possível duplicata)
+      const existingByEmail = await this.prisma.user.findUnique({
+        where: { email },
+        include: { tenant: true },
+      });
+
+      if (existingByEmail) {
+        // Vincula o clerkId ao user existente
+        this.logger.log(
+          `Guard: User ${email} já existe (id=${existingByEmail.id}). Vinculando clerkId...`,
+        );
+        return this.prisma.user.update({
+          where: { id: existingByEmail.id },
+          data: { clerkId: clerkUserId, avatarUrl: image },
+          include: { tenant: true },
+        });
+      }
+
+      // Cria tudo numa transação
+      const defaultPlan = await this.prisma.plan.findFirst();
+      if (!defaultPlan) {
+        this.logger.error(
+          'Guard: Nenhum plano cadastrado no banco. Impossível provisionar.',
+        );
+        return null;
+      }
+
+      const firstName = name.split(' ')[0];
+      const tempSlug = `tenant-${Date.now()}`;
+
+      const newUser = await this.prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: {
+            name: `Empresa de ${firstName}`,
+            slug: tempSlug,
+            isActive: true,
+            trialEndsAt: addDays(new Date(), 7),
+            planId: defaultPlan.id,
+          },
+        });
+
+        const createdUser = await tx.user.create({
+          data: {
+            clerkId: clerkUserId,
+            email,
+            name,
+            avatarUrl: image,
+            password: '',
+            role: 'OWNER',
+            tenantId: tenant.id,
+          },
+          include: { tenant: true },
+        });
+
+        await tx.warehouse.create({
+          data: {
+            name: 'Depósito Principal',
+            tenantId: tenant.id,
+            responsibleUserId: createdUser.id,
+            isDefault: true,
+          },
+        });
+
+        this.logger.log(
+          `Guard: ✅ Auto-provisioning completo: user=${createdUser.id} email=${email} tenant=${tenant.id} (${tenant.name})`,
+        );
+
+        return createdUser;
+      });
+
+      return newUser;
+    } catch (error) {
+      this.logger.error(
+        `Guard: Erro no auto-provisioning do usuário ${clerkUserId}: ${error.message}`,
+        error.stack,
+      );
+      return null;
     }
   }
 }
