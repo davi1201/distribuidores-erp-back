@@ -52,7 +52,7 @@ export class CustomThrottlerGuard extends ThrottlerGuard {
     const path = request.url || request.path;
 
     // Webhooks e health checks ignoram rate limiting
-    if (SKIP_ROUTES.some((route) => path.startsWith(route))) {
+    if (SKIP_ROUTES.some((route) => path.includes(route))) {
       return true;
     }
 
