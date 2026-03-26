@@ -244,7 +244,7 @@ export class AsaasOnboardingService {
 
       const payload = {
         name: tenant.name,
-        email: tenant.billingProfile.email,
+        email: tenant.billingProfile.billingEmail,
         cpfCnpj: cleanCpfCnpj,
         mobilePhone: cleanPhone,
         incomeValue: 5000,
