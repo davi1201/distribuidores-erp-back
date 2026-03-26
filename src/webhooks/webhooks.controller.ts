@@ -50,7 +50,9 @@ export class WebhooksController {
     const eventType = evt.type;
     const data = evt.data;
 
-    this.logger.log(`📥 Webhook recebido: ${eventType}`);
+    this.logger.log(
+      `📥 Webhook recebido: type=${eventType} id=${data?.id ?? 'N/A'} email=${data?.email_addresses?.[0]?.email_address ?? 'N/A'}`,
+    );
 
     try {
       switch (eventType) {
@@ -103,10 +105,10 @@ export class WebhooksController {
     const image = data.profile_image_url;
     const clerkId = data.id;
 
-    this.logger.log(`🔄 SyncUser: Processando ${email} (${clerkId})`);
+    this.logger.log(
+      `🔄 SyncUser: email=${email} clerkId=${clerkId} name="${name}"`,
+    );
 
-    // 1. Verificação Dupla (Evita erro P2002 Unique Constraint)
-    // Procuramos por ID do Clerk OU por Email
     const existingUser = await this.prisma.user.findFirst({
       where: {
         OR: [{ clerkId: clerkId }, { email: email }],
@@ -114,31 +116,71 @@ export class WebhooksController {
     });
 
     if (existingUser) {
-      // Se achou, atualiza (mesmo que o ID do clerk tenha mudado, o email manda)
       this.logger.log(
-        `✅ Usuário encontrado (ID: ${existingUser.id}). Atualizando...`,
+        `✅ Usuário já existe: id=${existingUser.id} tenantId=${existingUser.tenantId ?? 'NULL'} role=${existingUser.role}. Atualizando dados...`,
       );
       await this.prisma.user.update({
         where: { id: existingUser.id },
         data: {
-          clerkId: clerkId, // Garante que o ID do Clerk esteja atualizado
+          clerkId: clerkId,
           email,
           name,
           avatarUrl: image,
         },
       });
     } else {
-      // Se não achou nem por ID nem por Email, cria
-      this.logger.log(`✨ Criando novo usuário...`);
-      await this.prisma.user.create({
-        data: {
-          clerkId,
-          email,
-          name,
-          avatarUrl: image,
-          password: '', // Legado
-          role: 'OWNER', // Padrão até ser vinculado a uma org
-        },
+      this.logger.log(
+        `✨ Usuário novo (${email}). Provisionando User + Tenant + Warehouse em transação...`,
+      );
+
+      const defaultPlan = await this.prisma.plan.findFirst();
+      if (!defaultPlan) {
+        this.logger.error(
+          '❌ ERRO CRÍTICO: Nenhum plano cadastrado no banco. Impossível criar tenant para novo usuário.',
+        );
+        throw new Error(
+          'Nenhum plano cadastrado. Impossível provisionar tenant.',
+        );
+      }
+
+      const tempSlug = `tenant-${Date.now()}`;
+      const firstName = name.split(' ')[0] || 'Novo Usuário';
+
+      await this.prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: {
+            name: `Empresa de ${firstName}`,
+            slug: tempSlug,
+            isActive: true,
+            trialEndsAt: addDays(new Date(), 7),
+            planId: defaultPlan.id,
+          },
+        });
+
+        const user = await tx.user.create({
+          data: {
+            clerkId,
+            email,
+            name,
+            avatarUrl: image,
+            password: '',
+            role: 'OWNER',
+            tenantId: tenant.id,
+          },
+        });
+
+        await tx.warehouse.create({
+          data: {
+            name: 'Depósito Principal',
+            tenantId: tenant.id,
+            responsibleUserId: user.id,
+            isDefault: true,
+          },
+        });
+
+        this.logger.log(
+          `✅ Provisão completa: user=${user.id} tenant=${tenant.id} (${tenant.name}) warehouse=default`,
+        );
       });
     }
   }
@@ -149,87 +191,151 @@ export class WebhooksController {
   }
 
   private async syncTenant(data: any) {
-    this.logger.log(`🏢 SyncTenant: ${data.name} (${data.id})`);
-    const defaultPlan = await this.prisma.plan.findFirst();
+    const clerkOrgId = data.id;
+    const orgName = data.name;
+    const orgSlug = data.slug;
+    const creatorClerkId = data.created_by;
 
-    if (!defaultPlan) {
-      const errorMsg =
-        '⚠️ ERRO CRÍTICO: Tentativa de criar Tenant sem Planos cadastrados no banco.';
-      this.logger.error(errorMsg);
-      throw new Error(errorMsg);
+    this.logger.log(
+      `🏢 SyncTenant: name="${orgName}" clerkOrgId=${clerkOrgId} createdBy=${creatorClerkId ?? 'N/A'}`,
+    );
+
+    // 1. Já existe um Tenant com esse clerkId? Apenas atualiza.
+    const existingTenantByClerk = await this.prisma.tenant.findUnique({
+      where: { clerkId: clerkOrgId },
+    });
+
+    if (existingTenantByClerk) {
+      this.logger.log(
+        `🏢 Tenant já vinculado ao clerkId ${clerkOrgId} (id=${existingTenantByClerk.id}). Atualizando nome/slug.`,
+      );
+      await this.prisma.tenant.update({
+        where: { id: existingTenantByClerk.id },
+        data: {
+          name: orgName,
+          slug: orgSlug || existingTenantByClerk.slug,
+        },
+      });
+      return;
     }
 
-    const tenant = await this.prisma.tenant.upsert({
-      where: { clerkId: data.id },
-      update: {
-        name: data.name,
-        slug: data.slug,
-      },
-      create: {
-        clerkId: data.id,
-        name: data.name,
+    // 2. Se o criador já tem um Tenant (auto-provisionado pelo syncUser),
+    //    vincula o clerkId da org a esse Tenant existente.
+    if (creatorClerkId) {
+      const creator = await this.prisma.user.findUnique({
+        where: { clerkId: creatorClerkId },
+        include: { tenant: true },
+      });
+
+      if (creator?.tenant && !creator.tenant.clerkId) {
+        this.logger.log(
+          `🔗 Criador ${creator.email} já possui Tenant ${creator.tenant.id} (sem clerkId). Vinculando clerkId da org...`,
+        );
+        await this.prisma.tenant.update({
+          where: { id: creator.tenant.id },
+          data: {
+            clerkId: clerkOrgId,
+            name: orgName,
+            slug: orgSlug || creator.tenant.slug,
+          },
+        });
+        return;
+      }
+    }
+
+    // 3. Nenhum Tenant existente — cria um novo.
+    this.logger.log(
+      `🆕 Nenhum Tenant existente para clerkOrgId=${clerkOrgId}. Criando novo...`,
+    );
+    const defaultPlan = await this.prisma.plan.findFirst();
+    if (!defaultPlan) {
+      this.logger.error('❌ ERRO CRÍTICO: Nenhum plano cadastrado no banco.');
+      throw new Error('Nenhum plano cadastrado.');
+    }
+
+    const tenant = await this.prisma.tenant.create({
+      data: {
+        clerkId: clerkOrgId,
+        name: orgName,
         trialEndsAt: addDays(new Date(), 7),
-        slug: data.slug || `org-${data.id}`,
+        slug: orgSlug || `org-${clerkOrgId}`,
         isActive: true,
-        plan: {
-          connect: { id: defaultPlan.id },
-        },
+        planId: defaultPlan.id,
       },
     });
 
-    // await this.prisma.user.update({
-    //   where: { clerkId: data.created_by },
-    //   data: { tenantId: tenant.id },
-    // });
-
-    const userIdToUpdate = data.created_by || data.user_id; // Ajuste conforme seu payload
-
-    if (userIdToUpdate) {
-      const userExists = await this.prisma.user.findUnique({
-        where: { clerkId: userIdToUpdate },
+    // Se temos o criador, vincula ele ao novo Tenant.
+    if (creatorClerkId) {
+      const creator = await this.prisma.user.findUnique({
+        where: { clerkId: creatorClerkId },
       });
 
-      if (userExists) {
-        // 3. Se existe, faz o update seguro
+      if (creator && !creator.tenantId) {
         await this.prisma.user.update({
-          where: { clerkId: userIdToUpdate },
-          data: { tenantId: tenant.id },
+          where: { id: creator.id },
+          data: { tenantId: tenant.id, role: 'OWNER' },
         });
+        this.logger.log(
+          `✅ Criador ${creator.email} vinculado ao novo Tenant ${tenant.id}`,
+        );
+      } else if (creator) {
+        this.logger.log(
+          `ℹ️ Criador ${creator.email} já possui tenantId=${creator.tenantId}. Não vinculado.`,
+        );
       } else {
-        // 4. Se não existe, apenas loga (não quebra a aplicação)
-        // Isso é comum em ambientes assíncronos
         this.logger.warn(
-          `Webhook organization.updated: Tentativa de atualizar usuário ${userIdToUpdate}, mas ele não existe no banco local ainda.`,
+          `⚠️ Criador clerkId=${creatorClerkId} não encontrado no banco.`,
         );
       }
     }
+
+    this.logger.log(`✅ Tenant criado: id=${tenant.id} name="${tenant.name}"`);
   }
 
   private async linkUserToTenant(data: any) {
-    console.log('data', data);
-
-    const clerkUserId = data.public_user_data.user_id;
-    const clerkOrgId = data.organization.id;
+    const clerkUserId = data.public_user_data?.user_id;
+    const clerkOrgId = data.organization?.id;
     const clerkRole = data.role;
 
-    this.logger.log(`🔗 LinkUser: User ${clerkUserId} -> Org ${clerkOrgId}`);
+    this.logger.log(
+      `🔗 LinkUser: clerkUserId=${clerkUserId} clerkOrgId=${clerkOrgId} role=${clerkRole}`,
+    );
 
-    // Tentativa de Retry Manual Simples (Caso o Tenant ainda não tenha sido salvo pelo outro webhook)
+    if (!clerkUserId || !clerkOrgId) {
+      this.logger.warn(
+        `⚠️ Dados incompletos no membership: userId=${clerkUserId} orgId=${clerkOrgId}. Ignorando.`,
+      );
+      return;
+    }
+
+    // Busca o Tenant pelo clerkId da org
     let tenant = await this.prisma.tenant.findUnique({
       where: { clerkId: clerkOrgId },
     });
 
+    // Se não encontrou, pode ser que o org.created ainda não chegou.
+    // Tenta encontrar pelo tenant já vinculado ao user (auto-provisionado).
     if (!tenant) {
-      this.logger.warn(
-        `⏳ Tenant ${clerkOrgId} não encontrado localmente. O webhook organization.created pode estar atrasado.`,
-      );
-      // Em produção, o ideal é deixar falhar e o Clerk tenta de novo,
-      // ou criar o Tenant aqui de forma "Stub" (apenas ID e Nome).
-      return;
-    }
+      const user = await this.prisma.user.findUnique({
+        where: { clerkId: clerkUserId },
+        include: { tenant: true },
+      });
 
-    let appRole = 'SELLER';
-    if (clerkRole === 'org:admin') appRole = 'ADMIN';
+      if (user?.tenant && !user.tenant.clerkId) {
+        this.logger.log(
+          `🔗 Tenant ${user.tenant.id} sem clerkId encontrado via user. Vinculando clerkId=${clerkOrgId}...`,
+        );
+        tenant = await this.prisma.tenant.update({
+          where: { id: user.tenant.id },
+          data: { clerkId: clerkOrgId },
+        });
+      } else {
+        this.logger.warn(
+          `⏳ Tenant clerkId=${clerkOrgId} não encontrado. Aguardando organization.created.`,
+        );
+        return;
+      }
+    }
 
     const user = await this.prisma.user.findUnique({
       where: { clerkId: clerkUserId },
@@ -237,9 +343,20 @@ export class WebhooksController {
 
     if (!user) {
       this.logger.warn(
-        `⏳ User ${clerkUserId} não encontrado para vínculo. Aguardando user.created.`,
+        `⏳ User clerkId=${clerkUserId} não encontrado. Aguardando user.created.`,
       );
       return;
+    }
+
+    let appRole = 'SELLER';
+    if (clerkRole === 'org:admin') appRole = 'ADMIN';
+    if (clerkRole === 'org:owner') appRole = 'OWNER';
+
+    // Se o user já está vinculado a este tenant, apenas atualiza a role
+    if (user.tenantId === tenant.id) {
+      this.logger.log(
+        `ℹ️ User ${user.email} já vinculado ao Tenant ${tenant.id}. Atualizando role para ${appRole}.`,
+      );
     }
 
     await this.prisma.user.update({
@@ -251,7 +368,9 @@ export class WebhooksController {
       },
     });
 
-    this.logger.log(`✅ Vínculo realizado com sucesso.`);
+    this.logger.log(
+      `✅ Vínculo: user=${user.email} → tenant=${tenant.name} (${tenant.id}) role=${appRole}`,
+    );
   }
 
   private async unlinkUserFromTenant(data: any) {

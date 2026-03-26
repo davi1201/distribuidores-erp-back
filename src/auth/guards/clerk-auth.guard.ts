@@ -46,6 +46,12 @@ export class ClerkAuthGuard implements CanActivate {
         );
       }
 
+      if (!user.tenantId) {
+        this.logger.warn(
+          `Guard: Usuário ${user.email} (id=${user.id}, clerkId=${clerkUserId}) existe mas NÃO possui tenantId. Possível falha no provisionamento do Tenant.`,
+        );
+      }
+
       // 4. Injeção de Contexto
       // O usuário existe, então injetamos no request para os Controllers usarem.
       request.user = {
